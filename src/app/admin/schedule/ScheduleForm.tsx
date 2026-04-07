@@ -1,6 +1,6 @@
 "use client"
 import { useState } from 'react'
-import { addSlot } from './actions'
+import { addAvailability } from './actions'
 
 export default function ScheduleForm() {
   const [day, setDay] = useState("1") // Padrão: Segunda-feira
@@ -21,7 +21,12 @@ export default function ScheduleForm() {
       return
     }
 
-    const res = await addSlot(Number(day), time)
+    // Calcula end_time (60 mins) para addAvailability
+    const [h, m] = time.split(':').map(Number)
+    const endHour = (h + 1).toString().padStart(2, '0')
+    const endTime = `${endHour}:${m.toString().padStart(2, '0')}`
+
+    const res = await addAvailability(Number(day), time, endTime)
     if (res?.error) {
       setError(res.error)
     } else {

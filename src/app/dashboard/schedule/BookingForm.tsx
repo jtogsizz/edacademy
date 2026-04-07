@@ -8,7 +8,13 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-export default function BookingForm({ groupedDates }: { groupedDates: Record<string, { startTimeISO: string, endTimeISO: string }[]> }) {
+export default function BookingForm({ 
+  groupedDates, 
+  teacherId 
+}: { 
+  groupedDates: Record<string, { startTimeISO: string, endTimeISO: string }[]>,
+  teacherId: string 
+}) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string|null>(null)
   const router = useRouter()
@@ -18,7 +24,7 @@ export default function BookingForm({ groupedDates }: { groupedDates: Record<str
   const handleBook = async (start: string, end: string) => {
     setLoading(true)
     setError(null)
-    const res = await bookSlot(start, end)
+    const res = await bookSlot(start, end, teacherId)
     
     if (res?.error) {
       setError(res.error)
