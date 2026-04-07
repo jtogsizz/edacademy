@@ -4,11 +4,11 @@ import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import ProfileAvatarUpload from '@/components/ProfileAvatarUpload'
-import ProfileEditForm from '@/components/ProfileEditForm'
+import ProfileEditContainer from '@/components/ProfileEditContainer'
 import RecurringClassForm from './RecurringClassForm'
 import { getUnifiedStudentAgenda } from '@/utils/agendaUtils'
 import { updateProfile } from '@/app/dashboard/actions'
+
 
 
 export default async function StudentProfilePage() {
@@ -97,25 +97,15 @@ export default async function StudentProfilePage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(Min(100%, 350px), 1fr))', gap: '2rem', marginBottom: '3rem' }}>
         {/* Info Card com Upload de Avatar e Form de Edição */}
         <section className="card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            <ProfileAvatarUpload currentAvatarUrl={profile?.avatar_url} userId={user.id} />
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{profile?.full_name}</h3>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{user.email}</div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <span className={`badge ${isActive ? 'badge-active' : 'badge-inactive'}`}>
-                  {isActive ? 'Ativa' : 'Inativa'}
-                </span>
-                <span className="badge" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
-                  {profile?.replacement_credits || 0} Reposições
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <ProfileEditForm 
-            initialFullName={profile?.full_name || ''} 
-            initialWhatsapp={profile?.whatsapp_number || ''} 
+          <ProfileEditContainer 
+            userId={user.id} 
+            initialProfile={{
+              full_name: profile?.full_name || '',
+              whatsapp_number: profile?.whatsapp_number || '',
+              instagram_handle: profile?.instagram_handle || '',
+              avatar_url: profile?.avatar_url || null
+            }}
+            isReadOnly={true}
             saveAction={updateProfile}
           />
         </section>
@@ -141,7 +131,7 @@ export default async function StudentProfilePage() {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Escolha o seu horário oficial do plano (1 por semana).</p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(350px, 1fr) 1fr', gap: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(Min(100%, 350px), 1fr))', gap: '2rem' }}>
           {/* Dynamic Form */}
           <RecurringClassForm teachers={teachers || []} />
 
@@ -253,7 +243,7 @@ export default async function StudentProfilePage() {
 
       <style dangerouslySetInnerHTML={{__html: `
         @media (max-width: 600px) {
-          section[style*="grid-template-columns: minmax"] { grid-template-columns: 1fr !important; }
+          *[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
           .card[style*="justify-content: space-between"] { flex-direction: column; align-items: flex-start !important; }
           .save-button-container { width: 100%; }
           .save-button-container button { width: 100%; justify-content: center; }

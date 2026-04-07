@@ -4,10 +4,8 @@ import LogoutButton from '@/components/LogoutButton'
 import { toggleSubscriptionStatus } from '@/app/admin/actions'
 import SubscriptionManualManager from '@/components/SubscriptionManualManager'
 import Link from 'next/link'
-import ProfileAvatarUpload from '@/components/ProfileAvatarUpload'
-import ProfileEditForm from '@/components/ProfileEditForm'
+import ProfileEditContainer from '@/components/ProfileEditContainer'
 import { updateProfile } from '@/app/dashboard/actions'
-
 
 export default async function AdminProfilePage() {
   const supabase = await createClient()
@@ -51,28 +49,21 @@ export default async function AdminProfilePage() {
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-main)' }}>
           <h3>Configurações e Perfil</h3>
         </div>
-        <div style={{ padding: '2rem', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ padding: '2rem' }}>
           
-          {/* Avatar Area */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-             <ProfileAvatarUpload currentAvatarUrl={profile?.avatar_url} userId={user.id} size="120px" />
-             <div style={{ textAlign: 'center' }}>
-               <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{profile?.full_name}</h4>
-               <span style={{ fontSize: '0.8rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary-hover)', borderRadius: '12px', fontWeight: 600 }}>
-                 {profile?.role === 'admin_master' ? 'Admin Master' : 'Professor'}
-               </span>
-             </div>
-          </div>
-
-          <ProfileEditForm 
-            initialFullName={profile?.full_name || ''} 
-            initialWhatsapp={profile?.whatsapp_number || ''} 
-            initialInstagram={profile?.instagram_handle || ''}
+          <ProfileEditContainer 
+            userId={user.id} 
+            initialProfile={{
+              full_name: profile?.full_name || '',
+              whatsapp_number: profile?.whatsapp_number || '',
+              instagram_handle: profile?.instagram_handle || '',
+              avatar_url: profile?.avatar_url || null
+            }}
+            isReadOnly={false}
             saveAction={updateProfile}
           />
 
-
-          <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+          <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginTop: '2rem' }}>
             <Link href="/admin/schedule" className="btn-outline" style={{ display: 'inline-flex', width: '100%', justifyContent: 'center' }}>
               {profile?.role === 'admin_master' ? 'Gerenciar Minhas Aulas' : 'Gerenciar Horários da Agenda'}
             </Link>
@@ -256,4 +247,3 @@ export default async function AdminProfilePage() {
     </div>
   )
 }
-
