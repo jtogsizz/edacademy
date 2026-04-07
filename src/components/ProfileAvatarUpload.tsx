@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-
 import { updateProfileAvatar } from '@/app/dashboard/actions'
 
 interface Props {
@@ -15,16 +14,17 @@ interface Props {
   onUploadEnd: () => void
 }
 
-export default function ProfileAvatarUpload({ 
-  currentAvatarUrl, 
-  userId, 
+export default function ProfileAvatarUpload({
+  currentAvatarUrl,
+  userId,
   size = '80px',
   isUploading: parentLoading,
   onUploadStart,
-  onUploadEnd
+  onUploadEnd,
 }: Props) {
   const [preview, setPreview] = useState<string | null>(currentAvatarUrl)
-  const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -32,21 +32,24 @@ export default function ProfileAvatarUpload({
     const file = e.target.files?.[0]
     if (!file) return
 
-    // 1. Validação de Formato
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+    // Reset state
+    setStatus('idle')
+    setErrorMsg(null)
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     if (!allowedTypes.includes(file.type)) {
-      setError('Por favor, selecione JPEG, PNG ou WebP.')
+      setStatus('error')
+      setErrorMsg('Use JPEG, PNG ou WebP.')
       return
     }
 
-    // 2. Validação de Tamanho (2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setError('A imagem deve ter no máximo 2MB.')
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus('error')
+      setErrorMsg('Máximo 5MB.')
       return
     }
 
     onUploadStart()
-    setError(null)
 
     // Preview local imediato
     const objectUrl = URL.createObjectURL(file)
@@ -54,86 +57,163 @@ export default function ProfileAvatarUpload({
 
     try {
       const supabase = createClient()
-      
+
       const fileExt = file.name.split('.').pop()
       const fileName = `${userId}/${Date.now()}.${fileExt}`
-      
+
       const { data, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, file, { upsert: true })
 
       if (uploadError) throw uploadError
 
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(data.path)
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('avatars').getPublicUrl(data.path)
 
-      // Atualizar no banco via Server Action
+      // Salva a URL no banco
       const res = await updateProfileAvatar(publicUrl)
       if (res.error) throw new Error(res.error)
 
-      router.refresh()
+      setStatus('success')
+      setTimeout(() => setStatus('idle'), 4000)
 
+      router.refresh()
     } catch (err: any) {
-      setError(err.message || 'Erro ao atualizar foto.')
-      setPreview(currentAvatarUrl) // Reverter
+      setStatus('error')
+      setErrorMsg(err.message || 'Erro ao salvar foto.')
+      setPreview(currentAvatarUrl)
     } finally {
-      URL.revokeObjectURL(objectUrl) // [REVOGAR OBJECT URL]
+      URL.revokeObjectURL(objectUrl)
       onUploadEnd()
     }
   }
 
+  const sizeNum = parseInt(size)
+
   return (
-    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      {/* Círculo da Foto */}
-      <div style={{ 
-        width: '100%', height: '100%', borderRadius: '50%', backgroundColor: 'var(--primary-light)', 
-        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', 
-        border: '3px solid var(--bg-card)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', cursor: (parentLoading) ? 'not-allowed' : 'pointer',
-        position: 'relative'
-      }} onClick={() => !parentLoading && fileInputRef.current?.click()}>
-        <img 
-          src={preview || '/default-avatar.svg'} 
-          alt="Avatar" 
-          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: (parentLoading) ? 0.5 : 1 }} 
-        />
-        
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
+      {/* Círculo clicável */}
+      <div
+        style={{
+          position: 'relative',
+          width: size,
+          height: size,
+          flexShrink: 0,
+          cursor: parentLoading ? 'not-allowed' : 'pointer',
+        }}
+        onClick={() => !parentLoading && fileInputRef.current?.click()}
+        title="Clique para trocar a foto"
+      >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: '3px solid var(--bg-card)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            backgroundColor: 'var(--primary-light)',
+          }}
+        >
+          <img
+            src={preview || '/default-avatar.svg'}
+            alt="Foto de perfil"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: parentLoading ? 0.4 : 1,
+              transition: 'opacity 0.2s',
+            }}
+          />
+        </div>
+
+        {/* Overlay de loading */}
         {parentLoading && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <div className="spinner" style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></div>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: '50%',
+              backgroundColor: 'rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '22px',
+                height: '22px',
+                border: '2px solid white',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
           </div>
         )}
 
-        {/* Overlay de Hover */}
+        {/* Ícone de câmera quando idle */}
         {!parentLoading && (
-          <div className="avatar-overlay" style={{ 
-            position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-            opacity: 0, transition: 'opacity 0.2s ease', transitionDelay: '0.1s'
-          }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '2px',
+              right: '2px',
+              width: '26px',
+              height: '26px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
           </div>
         )}
       </div>
 
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        accept="image/*" 
-        style={{ display: 'none' }} 
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        style={{ display: 'none' }}
         disabled={parentLoading}
       />
 
-      {error && (
-        <div style={{ position: 'absolute', bottom: '-25px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: '0.7rem', color: 'var(--error)' }}>
-          {error}
-        </div>
-      )}
+      {/* Feedback de status inline */}
+      <div style={{ textAlign: 'center', minHeight: '20px' }}>
+        {parentLoading && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 500 }}>
+            Enviando foto...
+          </span>
+        )}
+        {!parentLoading && status === 'success' && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 500 }}>
+            ✓ Foto salva!
+          </span>
+        )}
+        {!parentLoading && status === 'error' && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--error)' }}>
+            {errorMsg}
+          </span>
+        )}
+        {!parentLoading && status === 'idle' && (
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            Clique para trocar
+          </span>
+        )}
+      </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes spin { to { transform: rotate(360deg); } }
-        div:hover .avatar-overlay { opacity: 1 !important; }
-      `}} />
+      <style dangerouslySetInnerHTML={{ __html: `@keyframes spin { to { transform: rotate(360deg); } }` }} />
     </div>
   )
 }
-
