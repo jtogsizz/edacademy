@@ -91,32 +91,59 @@ export default async function StudentProfilePage() {
         <LogoutButton />
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
-        {/* Info Card com Upload de Avatar */}
-        <section className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.5rem' }}>
-          <ProfileAvatarUpload currentAvatarUrl={profile?.avatar_url} userId={user.id} />
-          
-          <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{profile?.full_name}</h3>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{user.email}</div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span className={`badge ${isActive ? 'badge-active' : 'badge-inactive'}`}>
-                {isActive ? 'Assinatura Ativa' : 'Pendente / Inativa'}
-              </span>
-              <span className="badge" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
-                {profile?.replacement_credits || 0} Créditos de Reposição
-              </span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(Min(100%, 350px), 1fr))', gap: '2rem', marginBottom: '3rem' }}>
+        {/* Info Card com Upload de Avatar e Form de Edição */}
+        <section className="card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <ProfileAvatarUpload currentAvatarUrl={profile?.avatar_url} userId={user.id} />
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{profile?.full_name}</h3>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{user.email}</div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <span className={`badge ${isActive ? 'badge-active' : 'badge-inactive'}`}>
+                  {isActive ? 'Ativa' : 'Inativa'}
+                </span>
+                <span className="badge" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
+                  {profile?.replacement_credits || 0} Reposições
+                </span>
+              </div>
             </div>
           </div>
+
+          <form action={async (formData) => {
+            'use server'
+            const fullName = formData.get('fullName') as string
+            const whatsapp = formData.get('whatsapp') as string
+            const { updateProfile } = await import('@/app/dashboard/actions')
+            await updateProfile(fullName, whatsapp)
+          }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>Nome Completo</label>
+              <input name="fullName" defaultValue={profile?.full_name || ''} required />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>WhatsApp</label>
+              <input name="whatsapp" defaultValue={profile?.whatsapp_number || ''} placeholder="Ex: 11999999999" />
+            </div>
+            <div className="save-button-container">
+               <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Salvar Alterações</button>
+            </div>
+          </form>
         </section>
 
-        {/* Contact Info */}
-        <section className="card" style={{ padding: '1.5rem' }}>
-          <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>WhatsApp</h4>
-          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{profile?.whatsapp_number || 'Telefone não cadastrado'}</div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>Utilizado para avisos automáticos e contato com professores.</p>
+        {/* Status Info (Placeholder or useful stats) */}
+        <section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Sobre sua conta</h4>
+          <p style={{ fontSize: '0.95rem', lineHeight: '1.6' }}>
+            Mantenha seu <strong>WhatsApp</strong> atualizado para receber avisos de aulas e links do Google Meet diretamente dos seus professores.
+          </p>
+          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Plano Atual</div>
+             <div style={{ fontWeight: 600 }}>{isActive ? 'Assinatura EdAcademy Pro' : 'Nenhum plano ativo'}</div>
+          </div>
         </section>
       </div>
+
 
       {/* Recorrência Section */}
       <section className="card" style={{ marginBottom: '3rem', border: '1px solid var(--primary-light)' }}>
@@ -239,6 +266,8 @@ export default async function StudentProfilePage() {
         @media (max-width: 600px) {
           section[style*="grid-template-columns: minmax"] { grid-template-columns: 1fr !important; }
           .card[style*="justify-content: space-between"] { flex-direction: column; align-items: flex-start !important; }
+          .save-button-container { width: 100%; }
+          .save-button-container button { width: 100%; justify-content: center; }
         }
       `}} />
     </div>

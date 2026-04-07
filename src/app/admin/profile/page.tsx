@@ -69,7 +69,13 @@ export default async function AdminProfilePage() {
             
             const { updateAdminProfile } = await import('@/app/admin/actions')
             await updateAdminProfile(fullName, whatsapp, instagram)
-          }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', flex: 1, minWidth: '250px' }}>
+          }} style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(Min(100%, 280px), 1fr))', 
+            gap: '1.5rem', 
+            flex: 1, 
+            width: '100%' 
+          }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>Nome Completo</label>
               <input name="fullName" defaultValue={profile?.full_name || ''} required />
@@ -84,15 +90,12 @@ export default async function AdminProfilePage() {
               <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>Instagram (Usuário)</label>
               <input name="instagram" defaultValue={profile?.instagram_handle || ''} placeholder="Ex: @seuusuario" />
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Espaçador para manter o grid alinhado após remover a URL */}
-            </div>
             
-            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-start' }}>
-              <button type="submit" className="btn-primary" style={{ padding: '0.75rem 2rem', marginTop: '0.5rem', justifyContent: 'center', width: 'fit-content' }}>Salvar Alterações</button>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-start' }} className="save-button-container">
+              <button type="submit" className="btn-primary" style={{ padding: '0.75rem 2rem', marginTop: '0.5rem', justifyContent: 'center' }}>Salvar Alterações</button>
             </div>
           </form>
+
 
           <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
             <Link href="/admin/schedule" className="btn-outline" style={{ display: 'inline-flex', width: '100%', justifyContent: 'center' }}>
@@ -267,6 +270,15 @@ export default async function AdminProfilePage() {
           </table>
         </div>
       </section>
+      <style dangerouslySetInnerHTML={{__html: `
+        @media (max-width: 600px) {
+          section[style*="grid-template-columns: minmax"] { grid-template-columns: 1fr !important; }
+          .card[style*="justify-content: space-between"] { flex-direction: column; align-items: flex-start !important; }
+          .save-button-container { width: 100%; }
+          .save-button-container button { width: 100%; justify-content: center; }
+        }
+      `}} />
     </div>
   )
 }
+

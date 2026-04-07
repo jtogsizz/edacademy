@@ -52,3 +52,29 @@ export async function updateProfileAvatar(avatarUrl: string) {
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+/**
+ * Atualiza informações de contato do próprio usuário (nome, whatsapp).
+ * Funciona para Alunos e Admins.
+ */
+export async function updateProfile(fullName: string, whatsapp: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      full_name: fullName,
+      whatsapp_number: whatsapp || null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/dashboard/profile')
+  revalidatePath('/admin/profile')
+  return { success: true }
+}
+
