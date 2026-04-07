@@ -8,10 +8,13 @@ import ProfileEditContainer from '@/components/ProfileEditContainer'
 import RecurringClassForm from './RecurringClassForm'
 import { getUnifiedStudentAgenda } from '@/utils/agendaUtils'
 import { updateProfile } from '@/app/dashboard/actions'
+import { unstable_noStore as noStore } from 'next/cache'
 
 
 
 export default async function StudentProfilePage() {
+  // Garante que essa página sempre busca dados frescos do banco, nunca do cache
+  noStore()
   const supabase = await createClient()
 
   const {

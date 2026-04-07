@@ -6,8 +6,10 @@ import SubscriptionManualManager from '@/components/SubscriptionManualManager'
 import Link from 'next/link'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
 import { updateProfile } from '@/app/dashboard/actions'
+import { unstable_noStore as noStore } from 'next/cache'
 
 export default async function AdminProfilePage() {
+  noStore()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')

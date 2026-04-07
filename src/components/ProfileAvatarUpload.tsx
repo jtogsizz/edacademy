@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { updateProfileAvatar } from '@/app/dashboard/actions'
@@ -27,6 +27,14 @@ export default function ProfileAvatarUpload({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  // Sincroniza o preview quando o servidor atualiza o currentAvatarUrl
+  // (acontece após router.refresh() completar e o componente receber o novo prop)
+  useEffect(() => {
+    if (currentAvatarUrl) {
+      setPreview(currentAvatarUrl)
+    }
+  }, [currentAvatarUrl])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -71,20 +79,25 @@ export default function ProfileAvatarUpload({
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(data.path)
 
-      // Salva a URL no banco
+      // Salva a URL pública no banco
       const res = await updateProfileAvatar(publicUrl)
       if (res.error) throw new Error(res.error)
+
+      // Atualiza o preview para a URL permanente antes de revogar o objectUrl
+      setPreview(publicUrl)
+      URL.revokeObjectURL(objectUrl)
 
       setStatus('success')
       setTimeout(() => setStatus('idle'), 4000)
 
+      // Pede pro servidor revalidar e atualiza o componente
       router.refresh()
     } catch (err: any) {
       setStatus('error')
       setErrorMsg(err.message || 'Erro ao salvar foto.')
       setPreview(currentAvatarUrl)
-    } finally {
       URL.revokeObjectURL(objectUrl)
+    } finally {
       onUploadEnd()
     }
   }

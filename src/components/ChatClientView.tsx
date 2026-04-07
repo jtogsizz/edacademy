@@ -4,12 +4,14 @@ import { useState, useRef, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import Link from 'next/link'
+import { createClient } from '@/utils/supabase/client'
 
 const MOCK_EMOJIS = ['❤️', '👍', '😂', '👋', '🎯']
 
 type Message = {
   id: string
   sender_id: string
+  receiver_id: string
   content: string
   msg_type: 'text' | 'emoji'
   created_at: string
@@ -25,7 +27,7 @@ type Props = {
   backHref: string
 }
 
-export default function ChatClientView({ initialMessages, myUserId, chatPartnerName, chatPartnerAvatarUrl, sendAction, backHref }: Props) {
+export default function ChatClientView({ initialMessages, myUserId, chatPartnerId, chatPartnerName, chatPartnerAvatarUrl, sendAction, backHref }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [content, setContent] = useState("")
   const [loading, setLoading] = useState(false)
@@ -44,6 +46,49 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerN
     scrollToBottom()
   }, [messages])
 
+  // escuta as msgs novas em tempo real sem fazer reload
+  useEffect(() => {
+    const supabase = createClient()
+
+    // filtra pelo canal da conversa entre esses dois usuarios especificos
+    const channel = supabase
+      .channel(`chat:${[myUserId, chatPartnerId].sort().join('-')}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          const newMsg = payload.new as Message
+
+          // ignora mensagem que nao e dessa conversa
+          const isThisConversation =
+            (newMsg.sender_id === myUserId && newMsg.receiver_id === chatPartnerId) ||
+            (newMsg.sender_id === chatPartnerId && newMsg.receiver_id === myUserId)
+
+          if (!isThisConversation) return
+
+          // evita duplicar mensagem que o proprio usuario ja adicionou otimisticamente
+          setMessages(prev => {
+            const alreadyExists = prev.some(m => m.id === newMsg.id)
+            if (alreadyExists) return prev
+            // tb remove o fake otimístico se for msg propria (troca pelo id real)
+            const withoutFakes = newMsg.sender_id === myUserId
+              ? prev.filter(m => !m.id.includes('-') || m.id === newMsg.id)
+              : prev
+            return [...withoutFakes, newMsg]
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [myUserId, chatPartnerId])
+
   // atualizo local de forma optimística pro envio nao ficar engasgando o visual
   const handleSend = async (val: string, type: 'text' | 'emoji') => {
     if (!val.trim()) return
@@ -52,6 +97,7 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerN
     setMessages(prev => [...prev, {
       id: fakeId,
       sender_id: myUserId,
+      receiver_id: chatPartnerId,
       content: val,
       msg_type: type,
       created_at: new Date().toISOString()
