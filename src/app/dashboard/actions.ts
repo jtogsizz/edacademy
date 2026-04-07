@@ -54,10 +54,10 @@ export async function updateProfileAvatar(avatarUrl: string) {
 }
 
 /**
- * Atualiza informações de contato do próprio usuário (nome, whatsapp).
+ * Atualiza informações de contato do próprio usuário (nome, whatsapp, instagram).
  * Funciona para Alunos e Admins.
  */
-export async function updateProfile(fullName: string, whatsapp: string) {
+export async function updateProfile(fullName: string, whatsapp: string, instagram?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado' }
@@ -67,6 +67,7 @@ export async function updateProfile(fullName: string, whatsapp: string) {
     .update({
       full_name: fullName,
       whatsapp_number: whatsapp || null,
+      instagram_handle: instagram || null,
       updated_at: new Date().toISOString()
     })
     .eq('id', user.id)
@@ -77,4 +78,5 @@ export async function updateProfile(fullName: string, whatsapp: string) {
   revalidatePath('/admin/profile')
   return { success: true }
 }
+
 

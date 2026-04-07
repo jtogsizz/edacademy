@@ -5,6 +5,9 @@ import { toggleSubscriptionStatus } from '@/app/admin/actions'
 import SubscriptionManualManager from '@/components/SubscriptionManualManager'
 import Link from 'next/link'
 import ProfileAvatarUpload from '@/components/ProfileAvatarUpload'
+import ProfileEditForm from '@/components/ProfileEditForm'
+import { updateProfile } from '@/app/dashboard/actions'
+
 
 export default async function AdminProfilePage() {
   const supabase = await createClient()
@@ -61,40 +64,12 @@ export default async function AdminProfilePage() {
              </div>
           </div>
 
-          <form action={async (formData) => {
-            'use server'
-            const fullName = formData.get('fullName') as string
-            const whatsapp = formData.get('whatsapp') as string
-            const instagram = formData.get('instagram') as string
-            
-            const { updateAdminProfile } = await import('@/app/admin/actions')
-            await updateAdminProfile(fullName, whatsapp, instagram)
-          }} style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(Min(100%, 280px), 1fr))', 
-            gap: '1.5rem', 
-            flex: 1, 
-            width: '100%' 
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>Nome Completo</label>
-              <input name="fullName" defaultValue={profile?.full_name || ''} required />
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>WhatsApp (Apenas números)</label>
-              <input name="whatsapp" defaultValue={profile?.whatsapp_number || ''} placeholder="Ex: 11999999999" />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>Instagram (Usuário)</label>
-              <input name="instagram" defaultValue={profile?.instagram_handle || ''} placeholder="Ex: @seuusuario" />
-            </div>
-            
-            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-start' }} className="save-button-container">
-              <button type="submit" className="btn-primary" style={{ padding: '0.75rem 2rem', marginTop: '0.5rem', justifyContent: 'center' }}>Salvar Alterações</button>
-            </div>
-          </form>
+          <ProfileEditForm 
+            initialFullName={profile?.full_name || ''} 
+            initialWhatsapp={profile?.whatsapp_number || ''} 
+            initialInstagram={profile?.instagram_handle || ''}
+            saveAction={updateProfile}
+          />
 
 
           <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>

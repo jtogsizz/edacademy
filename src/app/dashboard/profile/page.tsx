@@ -5,8 +5,11 @@ import LogoutButton from '@/components/LogoutButton'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import ProfileAvatarUpload from '@/components/ProfileAvatarUpload'
+import ProfileEditForm from '@/components/ProfileEditForm'
 import RecurringClassForm from './RecurringClassForm'
 import { getUnifiedStudentAgenda } from '@/utils/agendaUtils'
+import { updateProfile } from '@/app/dashboard/actions'
+
 
 export default async function StudentProfilePage() {
   const supabase = await createClient()
@@ -110,25 +113,11 @@ export default async function StudentProfilePage() {
             </div>
           </div>
 
-          <form action={async (formData) => {
-            'use server'
-            const fullName = formData.get('fullName') as string
-            const whatsapp = formData.get('whatsapp') as string
-            const { updateProfile } = await import('@/app/dashboard/actions')
-            await updateProfile(fullName, whatsapp)
-          }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>Nome Completo</label>
-              <input name="fullName" defaultValue={profile?.full_name || ''} required />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>WhatsApp</label>
-              <input name="whatsapp" defaultValue={profile?.whatsapp_number || ''} placeholder="Ex: 11999999999" />
-            </div>
-            <div className="save-button-container">
-               <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Salvar Alterações</button>
-            </div>
-          </form>
+          <ProfileEditForm 
+            initialFullName={profile?.full_name || ''} 
+            initialWhatsapp={profile?.whatsapp_number || ''} 
+            saveAction={updateProfile}
+          />
         </section>
 
         {/* Status Info (Placeholder or useful stats) */}
