@@ -174,7 +174,10 @@ export default async function StudentProfilePage() {
             const start = new Date(apt.start_time)
             const end = new Date(apt.end_time)
             const now = new Date()
-            const canEnter = now >= start && now <= end
+            // Liberar acesso 10 min antes do início e durante toda a aula
+            const earlyEntry = new Date(start.getTime() - 10 * 60 * 1000)
+            const canEnter = now >= earlyEntry && now <= end
+            const isOngoing = now >= start && now <= end
             const teacher = apt.teacher
 
             return (
@@ -194,13 +197,15 @@ export default async function StudentProfilePage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <Link 
-                    href={`/dashboard/schedule?teacher_id=${teacher?.id}&reschedule_id=${apt.id}`}
-                    className="btn-outline"
-                    style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem', fontSize: '0.85rem', textDecoration: 'none' }}
-                  >
-                    Remarcar
-                  </Link>
+                  {!isOngoing && (
+                    <Link 
+                      href={`/dashboard/schedule?teacher_id=${teacher?.id}&reschedule_id=${apt.id}`}
+                      className="btn-outline"
+                      style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem', fontSize: '0.85rem', textDecoration: 'none' }}
+                    >
+                      Remarcar
+                    </Link>
+                  )}
                   <a 
                     href={canEnter ? meetLink : '#'}
                     target={canEnter ? "_blank" : undefined}
@@ -208,7 +213,7 @@ export default async function StudentProfilePage() {
                     className={`btn-primary ${!canEnter && 'disabled'}`}
                     style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
                   >
-                    {canEnter ? 'Entrar na Aula' : 'Aula inicia em breve'}
+                    {isOngoing ? 'Entrar na Aula' : canEnter ? 'Sala aberta' : 'Aula inicia em breve'}
                   </a>
                 </div>
               </div>

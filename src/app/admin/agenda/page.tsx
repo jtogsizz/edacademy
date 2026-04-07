@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
-import { format } from 'date-fns'
+import { format, addDays, addWeeks, getDay, startOfDay, isBefore } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import AdminCancellationControls from './AdminCancellationControls'
 
@@ -14,35 +14,105 @@ export default async function TeacherAgendaPage() {
   const { data: profile } = await supabase.from('profiles').select('id, role').eq('id', user.id).single()
   if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
 
-  // 1. Buscar todas as aulas agendadas para este professor
-  const { data: appointments } = await supabase
+  const isAdminMaster = profile?.role === 'admin_master'
+
+  // 1. Appointments pontuais (remarcações, extras)
+  let appointmentsQuery = supabase
     .from('appointments')
     .select(`
       id,
       start_time,
       end_time,
       status,
-      student:profiles!appointments_student_id_fkey (
-        id,
-        full_name,
-        whatsapp_number
-      )
+      teacher_id,
+      teacher:profiles!appointments_teacher_id_fkey ( id, full_name ),
+      student:profiles!appointments_student_id_fkey ( id, full_name, whatsapp_number )
     `)
-    .eq('teacher_id', user.id)
     .eq('status', 'scheduled')
     .order('start_time', { ascending: true })
 
-  // 2. Buscar link da aula
-  const { data: settings } = await supabase.from('settings').select('fixed_meet_link').single()
-  const meetLink = settings?.fixed_meet_link || 'https://meet.google.com/'
+  if (!isAdminMaster) {
+    appointmentsQuery = appointmentsQuery.eq('teacher_id', user.id)
+  }
 
-  const upcomingApts = (appointments ?? []).filter((apt: any) => {
+  const { data: appointments } = await appointmentsQuery
+
+  // 2. Aulas fixas recorrentes
+  let recurringQuery = supabase
+    .from('recurring_classes')
+    .select(`
+      id,
+      day_of_week,
+      start_time,
+      end_time,
+      teacher_id,
+      teacher:profiles!recurring_classes_teacher_id_fkey ( id, full_name ),
+      student:profiles!recurring_classes_student_id_fkey ( id, full_name, whatsapp_number )
+    `)
+
+  if (!isAdminMaster) {
+    recurringQuery = recurringQuery.eq('teacher_id', user.id)
+  }
+
+  const { data: recurringClasses } = await recurringQuery
+
+  // Expandir recorrências nos próximos 30 dias
+  const today = startOfDay(new Date())
+  const endLimit = addDays(today, 30)
+  const expandedRecurring: any[] = []
+
+  for (const rec of (recurringClasses || [])) {
+    let current = today
+    while (getDay(current) !== rec.day_of_week) {
+      current = addDays(current, 1)
+    }
+    while (isBefore(current, endLimit)) {
+      const [sh, sm] = rec.start_time.split(':').map(Number)
+      const instanceStart = new Date(current)
+      instanceStart.setHours(sh, sm, 0, 0)
+
+      const [eh, em] = rec.end_time.split(':').map(Number)
+      const instanceEnd = new Date(current)
+      instanceEnd.setHours(eh, em, 0, 0)
+
+      // Manter visível até o término (inclui aulas em andamento)
+      if (instanceEnd > new Date()) {
+        // Verificar se já existe appointment pontual nesse horário (cancelamento ou remarcação)
+        const hasOverride = (appointments || []).some(
+          a => a.teacher_id === rec.teacher_id && new Date(a.start_time).getTime() === instanceStart.getTime()
+        )
+        if (!hasOverride) {
+          expandedRecurring.push({
+            id: `rec-${rec.id}-${instanceStart.toISOString()}`,
+            start_time: instanceStart.toISOString(),
+            end_time: instanceEnd.toISOString(),
+            status: 'scheduled',
+            teacher: rec.teacher,
+            student: rec.student,
+            is_recurring: true
+          })
+        }
+      }
+      current = addWeeks(current, 1)
+    }
+  }
+
+  // 3. Unificar e ordenar
+  const allAppointments = [
+    ...(appointments || []).map((a: any) => ({ ...a, is_recurring: false })),
+    ...expandedRecurring
+  ].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+
+  // Filtrar apenas futuros (a partir de hoje)
+  const upcomingApts = allAppointments.filter(apt => {
     const end = new Date(apt.end_time)
-    const today = new Date(); today.setHours(0,0,0,0)
     return end >= today
   })
 
-  // Data de hoje para cancelamento de dia
+  // 4. Buscar link da aula
+  const { data: settings } = await supabase.from('settings').select('fixed_meet_link').single()
+  const meetLink = settings?.fixed_meet_link || 'https://meet.google.com/'
+
   const todayStr = format(new Date(), 'yyyy-MM-dd')
 
   return (
@@ -67,13 +137,15 @@ export default async function TeacherAgendaPage() {
             const start = new Date(apt.start_time)
             const end = new Date(apt.end_time)
             const now = new Date()
-            
-            // Janela de acesso
-            const canEnter = now >= start && now <= end
+
+            // Liberar acesso 10 min antes do início e durante toda a aula
+            const earlyEntry = new Date(start.getTime() - 10 * 60 * 1000)
+            const canEnter = now >= earlyEntry && now <= end
+            const isOngoing = now >= start && now <= end
             const student = apt.student
 
             return (
-              <div key={apt.id} className="card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', borderLeft: '5px solid var(--primary)' }}>
+              <div key={apt.id} className="card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', borderLeft: `5px solid ${apt.is_recurring ? 'var(--primary)' : 'var(--success)'}` }}>
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                   <div style={{ textAlign: 'center', minWidth: '80px', borderRight: '1px solid var(--border)', paddingRight: '1.5rem' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
@@ -82,14 +154,17 @@ export default async function TeacherAgendaPage() {
                     <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{format(start, 'dd/MM')}</div>
                   </div>
                   <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: apt.is_recurring ? 'var(--primary)' : 'var(--success)', textTransform: 'uppercase', marginBottom: '0.2rem', letterSpacing: '0.05em' }}>
+                      {apt.is_recurring ? 'Aula Fixa' : 'Extra / Reposição'}
+                    </div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.2rem' }}>
                       {format(start, 'HH:mm')} - {format(end, 'HH:mm')}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{student?.full_name}</span>
                       {student?.whatsapp_number && (
-                        <a 
-                          href={`https://wa.me/${student.whatsapp_number.replace(/\D/g, '')}`} 
+                        <a
+                          href={`https://wa.me/${student.whatsapp_number.replace(/\D/g, '')}`}
                           target="_blank" rel="noopener noreferrer"
                           style={{ color: 'var(--success)', display: 'flex', opacity: 0.8 }}
                         >
@@ -97,6 +172,11 @@ export default async function TeacherAgendaPage() {
                         </a>
                       )}
                     </div>
+                    {isAdminMaster && apt.teacher?.full_name && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Professor: {apt.teacher.full_name}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -105,14 +185,14 @@ export default async function TeacherAgendaPage() {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Ações Administrativas</div>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                       <AdminCancellationControls appointmentId={apt.id} type="single" />
-                      <a 
+                      <a
                         href={canEnter ? meetLink : '#'}
                         target={canEnter ? "_blank" : undefined}
                         rel={canEnter ? "noopener noreferrer" : undefined}
                         className={`btn-primary ${!canEnter && 'disabled'}`}
                         style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
                       >
-                        {canEnter ? 'Entrar Agora' : 'Em breve'}
+                        {isOngoing ? 'Entrar Agora' : canEnter ? 'Sala aberta' : 'Em breve'}
                       </a>
                     </div>
                   </div>

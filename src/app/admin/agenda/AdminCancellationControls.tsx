@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { cancelAppointmentByTeacher, cancelDayByTeacher } from '../../dashboard/schedule/actions'
+import { cancelAppointmentByTeacher, cancelDayByTeacher, cancelRecurringClassInstance } from '../../dashboard/schedule/actions'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -27,7 +27,11 @@ export default function AdminCancellationControls({ appointmentId, dateStr, type
     try {
       let res
       if (type === 'single' && appointmentId) {
-        res = await cancelAppointmentByTeacher(appointmentId, reason)
+        if (appointmentId.startsWith('rec-')) {
+          res = await cancelRecurringClassInstance(appointmentId, reason)
+        } else {
+          res = await cancelAppointmentByTeacher(appointmentId, reason)
+        }
       } else if (type === 'day' && dateStr) {
         res = await cancelDayByTeacher(dateStr, reason)
       }

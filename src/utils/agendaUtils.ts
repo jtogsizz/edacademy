@@ -64,12 +64,13 @@ export function getUnifiedStudentAgenda(
       // (Se houver um appointment no mesmo start_time, ele "vence" a recorrência)
       const override = oneOffAppointments.find(a => a.start_time === instanceStartISO)
 
-      if (!override && isAfter(instanceStart, new Date())) {
+      // Manter visível até o término da aula (não só enquanto não começou)
+      if (!override && instanceEnd > new Date()) {
         agenda.push({
           id: `rec-${rec.id}-${instanceStartISO}`,
           start_time: instanceStartISO,
           end_time: instanceEnd.toISOString(),
-          status: 'scheduled', // Recorrência ativa
+          status: 'scheduled',
           teacher: rec.teacher,
           is_recurring: true
         })

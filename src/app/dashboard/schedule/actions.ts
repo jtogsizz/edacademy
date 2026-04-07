@@ -61,8 +61,13 @@ export async function bookSlot(startTimeISO: string, endTimeISO: string, teacher
 }
 
 /**
- * Remarca uma aula (válido apenas para reposições/extras ou reagendamentos diretos)
- * Não consome crédito pois é uma troca de horário.
+ * Remarca uma aula.
+ *
+ * Dois fluxos:
+ * - ID real (UUID): appointment pontual → UPDATE direto, sem crédito.
+ * - ID sintético (rec-UUID-ISO): aula fixa do plano → troca de horário SEM crédito.
+ *   Grava um appointment cancelado no slot original (override do ScheduleEngine)
+ *   e cria um novo appointment no novo horário escolhido.
  */
 export async function rescheduleAppointment(appointmentId: string, newStartTimeISO: string, newEndTimeISO: string) {
   const supabase = await createClient()
@@ -73,13 +78,8 @@ export async function rescheduleAppointment(appointmentId: string, newStartTimeI
   const { data: subscription } = await supabase.from('subscriptions').select('status').eq('student_id', user.id).single()
   if (subscription?.status !== 'active') return { error: 'Sua conta está inativa. Renove para reagendar aulas.' }
 
-  // 1. Verificar se a aula é do usuário
-  const { data: apt } = await supabase.from('appointments').select('*').eq('id', appointmentId).maybeSingle()
-  if (apt?.student_id !== user.id) return { error: 'Acesso negado' }
-
   const { data: sub } = await supabase.from('subscriptions').select('end_date').eq('student_id', user.id).maybeSingle()
-  
-  // 2. Validar se a nova data é antes do vencimento
+
   if (sub?.end_date) {
     const newDate = new Date(newStartTimeISO)
     const expiry = new Date(sub.end_date)
@@ -88,11 +88,86 @@ export async function rescheduleAppointment(appointmentId: string, newStartTimeI
     }
   }
 
-  // 3. Atualizar a aula existente
+  // Aula fixa recorrente: ID sintético no formato rec-{recurringId}-{isoDate}
+  if (appointmentId.startsWith('rec-')) {
+    // partes: ['rec', seg1, seg2, seg3, seg4, seg5, ...ISO]
+    const parts = appointmentId.split('-')
+    const recurringId = parts.slice(1, 6).join('-')
+    // O ISO do slot original vem após o UUID (índice 6 em diante)
+    const originalSlotISO = parts.slice(6).join('-')
+
+    const { data: rec } = await supabase
+      .from('recurring_classes')
+      .select('teacher_id, student_id, start_time, end_time')
+      .eq('id', recurringId)
+      .eq('student_id', user.id)
+      .maybeSingle()
+
+    if (!rec) return { error: 'Aula fixa não encontrada ou não pertence à sua conta.' }
+
+    // Verificar conflito no novo horário
+    const { data: conflict } = await supabase
+      .from('appointments')
+      .select('id')
+      .eq('teacher_id', rec.teacher_id)
+      .eq('start_time', newStartTimeISO)
+      .eq('status', 'scheduled')
+      .maybeSingle()
+
+    if (conflict) return { error: 'Este horário já foi reservado por outro aluno.' }
+
+    // Registrar exceção de cancelamento para o slot original.
+    // O ScheduleEngine trata appointment cancelled como override da recorrência (slot fica livre para outros).
+    if (originalSlotISO) {
+      const [sh, sm] = rec.start_time.split(':').map(Number)
+      const [eh, em] = rec.end_time.split(':').map(Number)
+      const origStart = new Date(originalSlotISO)
+      origStart.setHours(sh, sm, 0, 0)
+      const origEnd = new Date(originalSlotISO)
+      origEnd.setHours(eh, em, 0, 0)
+
+      await supabase.from('appointments').insert({
+        student_id: user.id,
+        teacher_id: rec.teacher_id,
+        start_time: origStart.toISOString(),
+        end_time: origEnd.toISOString(),
+        status: 'cancelled',
+        cancellation_reason: 'Remarcado pelo aluno'
+      })
+    }
+
+    // Criar appointment no novo horário — sem consumo de crédito
+    const { error: insertError } = await supabase.from('appointments').insert({
+      student_id: user.id,
+      teacher_id: rec.teacher_id,
+      start_time: newStartTimeISO,
+      end_time: newEndTimeISO,
+      status: 'scheduled'
+    })
+
+    if (insertError) return { error: 'Erro ao salvar remarcação.' }
+
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/schedule')
+    revalidatePath('/dashboard/profile')
+    return { success: true }
+  }
+
+  // Appointment real: verificar ownership e fazer UPDATE
+  const { data: apt, error: fetchError } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('id', appointmentId)
+    .eq('student_id', user.id)
+    .maybeSingle()
+
+  if (fetchError) return { error: 'Erro ao verificar agendamento.' }
+  if (!apt) return { error: 'Agendamento não encontrado ou não pertence à sua conta.' }
+
   const { error } = await supabase
     .from('appointments')
-    .update({ 
-      start_time: newStartTimeISO, 
+    .update({
+      start_time: newStartTimeISO,
       end_time: newEndTimeISO,
       status: 'scheduled',
       updated_at: new Date().toISOString()
@@ -219,6 +294,73 @@ export async function removeRecurringClass(id: string) {
   const { error } = await supabase.from('recurring_classes').delete().eq('id', id).eq('student_id', user.id)
   if (error) return { error: error.message }
   
+  revalidatePath('/dashboard/profile')
+  return { success: true }
+}
+
+/**
+ * Cancela uma instância específica de uma aula fixa recorrente.
+ * Cria um appointment cancelado como exceção (o ScheduleEngine libera o slot)
+ * e concede 1 crédito de reposição ao aluno.
+ */
+export async function cancelRecurringClassInstance(syntheticId: string, reason: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado' }
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAnyAdmin = profile?.role === 'admin' || profile?.role === 'admin_master'
+  if (!isAnyAdmin) return { error: 'Apenas professores podem cancelar aulas.' }
+
+  // syntheticId: rec-{recurringId}-{isoDate}
+  const parts = syntheticId.split('-')
+  const recurringId = parts.slice(1, 6).join('-')
+  const slotDateISO = parts.slice(6).join('-')
+
+  const { data: rec } = await supabase
+    .from('recurring_classes')
+    .select('student_id, teacher_id, start_time, end_time')
+    .eq('id', recurringId)
+    .maybeSingle()
+
+  if (!rec) return { error: 'Aula recorrente não encontrada.' }
+
+  const [sh, sm] = rec.start_time.split(':').map(Number)
+  const [eh, em] = rec.end_time.split(':').map(Number)
+  const slotStart = new Date(slotDateISO)
+  slotStart.setHours(sh, sm, 0, 0)
+  const slotEnd = new Date(slotDateISO)
+  slotEnd.setHours(eh, em, 0, 0)
+
+  // Verificar se já existe uma exceção para esse slot (evitar duplicata)
+  const { data: existing } = await supabase
+    .from('appointments')
+    .select('id')
+    .eq('teacher_id', rec.teacher_id)
+    .eq('student_id', rec.student_id)
+    .eq('start_time', slotStart.toISOString())
+    .maybeSingle()
+
+  if (!existing) {
+    const { error: insertError } = await supabase.from('appointments').insert({
+      student_id: rec.student_id,
+      teacher_id: rec.teacher_id,
+      start_time: slotStart.toISOString(),
+      end_time: slotEnd.toISOString(),
+      status: 'cancelled',
+      cancellation_reason: reason,
+      cancelled_by: user.id
+    })
+    if (insertError) return { error: insertError.message }
+  }
+
+  // Conceder crédito de reposição ao aluno
+  const { data: studentProfile } = await supabase.from('profiles').select('replacement_credits').eq('id', rec.student_id).single()
+  await supabase.from('profiles').update({
+    replacement_credits: (studentProfile?.replacement_credits || 0) + 1
+  }).eq('id', rec.student_id)
+
+  revalidatePath('/admin/agenda')
   revalidatePath('/dashboard/profile')
   return { success: true }
 }
