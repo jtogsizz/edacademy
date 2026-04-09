@@ -15,7 +15,14 @@ export async function bookSlot(startTimeISO: string, endTimeISO: string, teacher
   const { data: subscription } = await supabase.from('subscriptions').select('status').eq('student_id', user.id).single()
   if (subscription?.status !== 'active') return { error: 'Sua conta está inativa. Renove para agendar aulas.' }
 
-  // 2. Tratar concorrência do horário (se alguém marcou entre o clique e o processamento)
+  // 2. Validação de idioma (segurança backend)
+  const { data: studentProf } = await supabase.from('profiles').select('student_language').eq('id', user.id).single()
+  const { data: teacherProf } = await supabase.from('profiles').select('language').eq('id', teacherId).single()
+  if (studentProf?.student_language && teacherProf?.language && studentProf.student_language !== teacherProf.language) {
+    return { error: 'Você só pode agendar aulas com professores do seu idioma.' }
+  }
+
+  // 3. Tratar concorrência do horário (se alguém marcou entre o clique e o processamento)
   const { data: conflict } = await supabase
     .from('appointments')
     .select('id')
@@ -219,6 +226,13 @@ export async function addRecurringClass(dayOfWeek: number, startTime: string, te
   // 0. Validar assinatura ativa
   const { data: subscription } = await supabase.from('subscriptions').select('status').eq('student_id', user.id).single()
   if (subscription?.status !== 'active') return { error: 'Sua conta está inativa. Renove para agendar aulas.' }
+
+  // 0b. Validação de idioma (segurança backend)
+  const { data: studentProfLang } = await supabase.from('profiles').select('student_language').eq('id', user.id).single()
+  const { data: teacherProfLang } = await supabase.from('profiles').select('language').eq('id', teacherId).single()
+  if (studentProfLang?.student_language && teacherProfLang?.language && studentProfLang.student_language !== teacherProfLang.language) {
+    return { error: 'Você só pode agendar aulas com professores do seu idioma.' }
+  }
 
   // 1. Validar limite do plano
   const { count } = await supabase

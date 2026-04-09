@@ -16,17 +16,33 @@ export default async function SchedulePage({
   const { data: subscription } = await supabase.from('subscriptions').select('*').eq('student_id', user.id).single()
   if (subscription?.status !== 'active') redirect('/dashboard')
 
+  // Buscar idioma do aluno (necessário para filtrar professores)
+  const { data: studentProfile } = await supabase
+    .from('profiles')
+    .select('student_language')
+    .eq('id', user.id)
+    .single()
+
+  const studentLanguage = studentProfile?.student_language ?? null
+
   // Resolvemos searchParams assíncronos (Next 15)
   const resolvedParams = await searchParams
   const teacherId = resolvedParams.teacher_id as string | undefined
 
   if (!teacherId) {
-    // Tela 1: Escolha de Professor
-    const { data: teachers } = await supabase
+    // Tela 1: Escolha de Professor — filtrar apenas professores do mesmo idioma
+    let teachersQuery = supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, role')
+      .select('id, full_name, avatar_url, role, language')
       .in('role', ['admin', 'admin_master'])
       .order('full_name', { ascending: true })
+
+    // Aplicar filtro de idioma apenas se o aluno tiver idioma definido
+    if (studentLanguage) {
+      teachersQuery = teachersQuery.eq('language', studentLanguage)
+    }
+
+    const { data: teachers } = await teachersQuery
 
     return (
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '1000px' }}>
@@ -59,7 +75,17 @@ export default async function SchedulePage({
   }
 
   // Tela 2: Calendário do Professor Específico
-  const { data: teacherProfile } = await supabase.from('profiles').select('full_name').eq('id', teacherId).single()
+  // Segurança: verificar que o professor visitado é do mesmo idioma do aluno
+  const { data: teacherProfile } = await supabase
+    .from('profiles')
+    .select('full_name, language')
+    .eq('id', teacherId)
+    .single()
+
+  // Bloquear acesso se idiomas não coincidem (protege bypass via URL)
+  if (studentLanguage && teacherProfile?.language && teacherProfile.language !== studentLanguage) {
+    redirect('/dashboard/schedule')
+  }
 
   const { data: availability } = await supabase.from('teacher_availability').select('*').eq('teacher_id', teacherId)
   const { data: recurring } = await supabase.from('recurring_classes').select('*').eq('teacher_id', teacherId)

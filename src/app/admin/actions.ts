@@ -47,6 +47,14 @@ export async function updateSubscriptionManual(
     .single()
 
   // 2. Atualizar assinatura
+  // Regra futura: bloquear ativação sem idioma definido
+  if (status === 'active') {
+    const { data: studentProf } = await supabase.from('profiles').select('student_language').eq('id', studentId).single()
+    if (!studentProf?.student_language) {
+      throw new Error('Defina o idioma do aluno antes de ativar o plano.')
+    }
+  }
+
   const { error } = await supabase
     .from('subscriptions')
     .update({ 
@@ -89,6 +97,14 @@ export async function toggleSubscriptionStatus(studentId: string, currentStatus:
   if (!isAuthorized) return
 
   const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
+
+  // Regra futura: bloquear ativação sem idioma definido
+  if (newStatus === 'active') {
+    const { data: studentProf } = await supabase.from('profiles').select('student_language').eq('id', studentId).single()
+    if (!studentProf?.student_language) {
+      return { error: 'Defina o idioma do aluno antes de ativar o plano.' }
+    }
+  }
   
   const { data: currentSub } = await supabase
     .from('subscriptions')
@@ -111,6 +127,39 @@ export async function toggleSubscriptionStatus(studentId: string, currentStatus:
     })
   }
 
+  revalidatePath('/admin/profile')
+}
+
+/**
+ * Define o idioma que um professor leciona.
+ * Apenas admin_master pode alterar.
+ */
+export async function setTeacherLanguage(teacherId: string, language: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin_master') return
+
+  await supabase.from('profiles').update({ language: language || null }).eq('id', teacherId)
+  revalidatePath('/admin/profile')
+}
+
+/**
+ * Define o idioma do aluno (determina quais professores ele pode ver/agendar).
+ * Admin ou admin_master podem definir.
+ */
+export async function setStudentLanguage(studentId: string, language: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'admin_master'
+  if (!isAdmin) return
+
+  await supabase.from('profiles').update({ student_language: language || null }).eq('id', studentId)
   revalidatePath('/admin/profile')
 }
 

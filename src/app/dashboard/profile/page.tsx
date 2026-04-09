@@ -41,12 +41,18 @@ export default async function StudentProfilePage() {
 
   const isActive = subscription?.status === 'active'
 
-  // 1. Buscar Professores Disponíveis
-  const { data: teachers } = await supabase
+  // 1. Buscar Professores Disponíveis — filtrar pelo idioma do aluno
+  let teachersQuery = supabase
     .from('profiles')
     .select('id, full_name')
     .in('role', ['admin', 'admin_master'])
     .order('full_name')
+
+  if (profile?.student_language) {
+    teachersQuery = teachersQuery.eq('language', profile.student_language)
+  }
+
+  const { data: teachers } = await teachersQuery
 
   // 2. Buscar Horários Fixos (Recorrência) do aluno
   const { data: recurring } = await supabase
@@ -113,16 +119,61 @@ export default async function StudentProfilePage() {
           />
         </section>
 
-        {/* Status Info (Placeholder or useful stats) */}
+        {/* Status Info — Plano e Idioma */}
         <section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Sobre sua conta</h4>
-          <p style={{ fontSize: '0.95rem', lineHeight: '1.6' }}>
-            Mantenha seu <strong>WhatsApp</strong> atualizado para receber avisos de aulas e links do Google Meet diretamente dos seus professores.
-          </p>
-          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Plano Atual</div>
-             <div style={{ fontWeight: 600 }}>{isActive ? 'Assinatura EdAcademy Pro' : 'Nenhum plano ativo'}</div>
+          <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Sua Conta</h4>
+
+          {/* Status do Plano */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '0.75rem' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Plano</div>
+              <div style={{ fontWeight: 600 }}>{isActive ? 'EdAcademy Pro' : 'Sem plano ativo'}</div>
+            </div>
+            <span style={{
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              padding: '0.25rem 0.65rem',
+              borderRadius: '99px',
+              backgroundColor: isActive ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.12)',
+              color: isActive ? '#059669' : 'var(--error)',
+              border: `1px solid ${isActive ? 'rgba(52, 211, 153, 0.35)' : 'rgba(239, 68, 68, 0.25)'}`,
+              letterSpacing: '0.03em',
+              textTransform: 'uppercase'
+            }}>
+              {isActive ? '● Ativo' : '● Inativo'}
+            </span>
           </div>
+
+          {/* Idioma com Acesso */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '0.75rem' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Idioma</div>
+              <div style={{ fontWeight: 600 }}>
+                {profile?.student_language
+                  ? ({'english':'Inglês','spanish':'Espanhol','french':'Francês','portuguese':'Português','german':'Alemão','italian':'Italiano','mandarin':'Mandarim','japanese':'Japonês'} as Record<string,string>)[profile.student_language] ?? profile.student_language
+                  : 'Não definido'}
+              </div>
+            </div>
+            {profile?.student_language ? (
+              <span style={{ fontSize: '1.3rem' }}>
+                {({'english':'🇺🇸','spanish':'🇪🇸','french':'🇫🇷','portuguese':'🇧🇷','german':'🇩🇪','italian':'🇮🇹','mandarin':'🇨🇳','japanese':'🇯🇵'} as Record<string,string>)[profile.student_language] ?? '🌐'}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Vencimento */}
+          {subscription?.end_date && (
+            <div style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Válido até</div>
+              <div style={{ fontWeight: 600 }}>{new Date(subscription.end_date).toLocaleDateString('pt-BR')}</div>
+            </div>
+          )}
+
+          {!isActive && (
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '1rem', lineHeight: 1.5 }}>
+              Para ativar seu acesso, entre em contato com a equipe EdAcademy.
+            </p>
+          )}
         </section>
       </div>
 

@@ -1,8 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import LogoutButton from '@/components/LogoutButton'
-import { toggleSubscriptionStatus } from '@/app/admin/actions'
 import SubscriptionManualManager from '@/components/SubscriptionManualManager'
+import ToggleSubscriptionButton from '@/components/ToggleSubscriptionButton'
 import Link from 'next/link'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
 import { updateProfile } from '@/app/dashboard/actions'
@@ -85,6 +85,7 @@ export default async function AdminProfilePage() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', backgroundColor: 'var(--bg-main)' }}>
                   <th style={{ padding: '1rem' }}>Professor</th>
+                  <th style={{ padding: '1rem' }}>Idioma</th>
                   <th style={{ padding: '1rem', textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
@@ -98,6 +99,28 @@ export default async function AdminProfilePage() {
                         </div>
                         <span style={{ fontWeight: 500 }}>{admin.full_name}</span>
                       </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <form action={async (fd: FormData) => {
+                        'use server'
+                        const { setTeacherLanguage } = await import('@/app/admin/actions')
+                        await setTeacherLanguage(admin.id, fd.get('language') as string)
+                      }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <select name="language" defaultValue={admin.language || ''}
+                          style={{ padding: '0.3rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.82rem' }}
+                        >
+                          <option value="">-- Nenhum --</option>
+                          <option value="english">Inglês</option>
+                          <option value="spanish">Espanhol</option>
+                          <option value="french">Francês</option>
+                          <option value="portuguese">Português</option>
+                          <option value="german">Alemão</option>
+                          <option value="italian">Italiano</option>
+                          <option value="mandarin">Mandarim</option>
+                          <option value="japanese">Japonês</option>
+                        </select>
+                        <button type="submit" className="btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}>Salvar</button>
+                      </form>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <form action={async () => {
@@ -114,7 +137,7 @@ export default async function AdminProfilePage() {
                 ))}
                 {admins.length === 0 && (
                   <tr>
-                    <td colSpan={2} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum professor além do Master. Promova um aluno abaixo.</td>
+                    <td colSpan={3} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum professor além do Master. Promova um aluno abaixo.</td>
                   </tr>
                 )}
               </tbody>
@@ -135,6 +158,7 @@ export default async function AdminProfilePage() {
                 <th style={{ padding: '1rem' }}>Nome</th>
                 <th style={{ padding: '1rem' }}>Status</th>
                 <th style={{ padding: '1rem', textAlign: 'center' }}>Vencimento</th>
+                <th style={{ padding: '1rem' }}>Idioma</th>
                 {profile?.role === 'admin_master' && <th style={{ padding: '1rem', textAlign: 'center' }}>Cargo</th>}
                 <th style={{ padding: '1rem', textAlign: 'right' }}>Ação (Acesso)</th>
               </tr>
@@ -192,6 +216,28 @@ export default async function AdminProfilePage() {
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       {sub?.end_date ? new Date(sub.end_date).toLocaleDateString('pt-BR') : '-'}
                     </td>
+                    <td style={{ padding: '1rem' }}>
+                      <form action={async (fd: FormData) => {
+                        'use server'
+                        const { setStudentLanguage } = await import('@/app/admin/actions')
+                        await setStudentLanguage(student.id, fd.get('lang') as string)
+                      }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <select name="lang" defaultValue={student.student_language || ''}
+                          style={{ padding: '0.3rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.82rem', maxWidth: '120px' }}
+                        >
+                          <option value="">--</option>
+                          <option value="english">Inglês</option>
+                          <option value="spanish">Espanhol</option>
+                          <option value="french">Francês</option>
+                          <option value="portuguese">Português</option>
+                          <option value="german">Alemão</option>
+                          <option value="italian">Italiano</option>
+                          <option value="mandarin">Mandarim</option>
+                          <option value="japanese">Japonês</option>
+                        </select>
+                        <button type="submit" className="btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}>✓</button>
+                      </form>
+                    </td>
                     {profile?.role === 'admin_master' && (
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
                         <form action={async () => {
@@ -206,15 +252,11 @@ export default async function AdminProfilePage() {
                       </td>
                     )}
                     <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                      <form action={async () => {
-                        'use server'
-                        const { toggleSubscriptionStatus } = await import('@/app/admin/actions')
-                        await toggleSubscriptionStatus(student.id, sub?.status || 'inactive')
-                      }}>
-                        <button type="submit" className="btn-outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', color: isActive ? 'var(--error)' : 'var(--success)', borderColor: isActive ? 'var(--error)' : 'var(--success)' }}>
-                          {isActive ? 'Bloquear Acesso' : 'Liberar Acesso'}
-                        </button>
-                      </form>
+                      <ToggleSubscriptionButton
+                        studentId={student.id}
+                        currentStatus={sub?.status || 'inactive'}
+                        isActive={isActive}
+                      />
 
                       {profile?.role === 'admin_master' && (
                         <SubscriptionManualManager 

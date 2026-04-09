@@ -1,28 +1,57 @@
 import React from 'react'
+import Image from 'next/image'
 
-export default function Logo({ width = 160, color = 'var(--primary)', textColor = 'var(--text-main)', hideText = false }: { width?: number, color?: string, textColor?: string, hideText?: boolean }) {
+export default function Logo({ 
+  width = 60, 
+  hideText = false,
+  textColor = 'var(--text-main)',
+  color = 'var(--primary)',
+  orientation = 'vertical'
+}: { 
+  width?: number, 
+  hideText?: boolean,
+  textColor?: string,
+  color?: string,
+  orientation?: 'horizontal' | 'vertical'
+}) {
+  const isVertical = orientation === 'vertical'
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', userSelect: 'none' }}>
-      <svg 
-        width={hideText ? width : width * 0.25} 
-        height={hideText ? width : width * 0.25} 
-        viewBox="0 0 100 100" 
-        fill="none" 
-        xmlns="http://www.w3.org/2000/svg"
-        style={{ flexShrink: 0 }}
-      >
-        <rect width="100" height="100" rx="24" fill={color} />
-        <path d="M50 25L25 40L50 55L75 40L50 25Z" fill="white" />
-        <path d="M25 55L50 70L75 55M25 65L50 80L75 65" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M50 55V70" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: isVertical ? 'column' : 'row',
+      alignItems: 'center', 
+      justifyContent: 'center',
+      gap: isVertical ? '8px' : '12px', 
+      userSelect: 'none',
+      textAlign: 'center'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'transform 0.2s ease',
+      }}>
+        <Image 
+          src="/images/logo.png" 
+          alt="Logo" 
+          width={width} 
+          height={width}
+          style={{ 
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.05))'
+          }}
+          priority
+        />
+      </div>
       {!hideText && (
         <span style={{ 
-          fontSize: `${width * 0.15}px`, 
+          fontSize: isVertical ? '1.75rem' : '1.5rem', 
           fontWeight: 800, 
           color: textColor,
-          letterSpacing: '-0.03em',
-          fontFamily: 'Inter, sans-serif'
+          letterSpacing: '-0.04em',
+          fontFamily: 'Inter, sans-serif',
+          lineHeight: 1.2
         }}>
           Ed<span style={{ color }}>Academy</span>
         </span>
