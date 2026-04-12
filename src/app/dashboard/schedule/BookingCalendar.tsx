@@ -133,7 +133,7 @@ export default function BookingCalendar({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
               {selectedSlots.map((slot, idx) => {
                 const prepStart = formatInTimeZone(parseISO(slot.prepStartTimeISO), userTimezone, "HH:mm", { locale: ptBR })
-                const classStart = formatInTimeZone(parseISO(slot.classStartTimeISO), userTimezone, "HH:mm", { locale: ptBR })
+                const classEnd = formatInTimeZone(parseISO(slot.endTimeISO), userTimezone, "HH:mm", { locale: ptBR })
 
                 if (slot.status === 'free') {
                   return (
@@ -142,38 +142,33 @@ export default function BookingCalendar({
                       onClick={() => handleAction(slot.startTimeISO, slot.endTimeISO)}
                       disabled={loading}
                       className="btn-outline hover-fx"
-                      style={{ padding: '0', display: 'flex', flexDirection: 'column', border: '1px solid var(--primary)', overflow: 'hidden', height: 'fit-content' }}
+                      style={{ padding: '1rem', display: 'flex', flexDirection: 'column', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', height: '100%', justifyContent: 'center', alignItems: 'center' }}
                     >
-                      <div style={{ backgroundColor: 'rgba(52, 211, 153, 0.1)', color: '#059669', fontSize: '0.7rem', padding: '0.35rem', width: '100%', textAlign: 'center', borderBottom: '1px solid rgba(52, 211, 153, 0.2)' }}>
-                        Preparação: {prepStart}
+                      <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '0.2rem' }}>
+                        {prepStart} — {classEnd}
                       </div>
-                      <div style={{ padding: '0.85rem', textAlign: 'center', width: '100%' }}>
-                        <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--text-main)' }}>{classStart}</div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--primary)' }}>Livre: Agendar</span>
-                      </div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--primary)' }}>Agendar Aula</span>
                     </button>
                   )
                 }
 
                 if (slot.status === 'my_class') {
                   return (
-                    <div key={idx} style={{ padding: '0', textAlign: 'center', backgroundColor: 'var(--primary)', color: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)', opacity: 0.9, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                      <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', fontSize: '0.7rem', padding: '0.35rem' }}>Preparação: {prepStart}</div>
-                      <div style={{ padding: '0.85rem' }}>
-                        <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{classStart}</div>
-                        <span style={{ display: 'block', fontSize: '0.7rem', marginTop: '0.2rem', fontWeight: 600 }}>Sua Aula!</span>
+                    <div key={idx} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--primary)', color: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.2rem' }}>
+                        {prepStart} — {classEnd}
                       </div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>Sua Aula</span>
                     </div>
                   )
                 }
 
                 return (
-                  <div key={idx} style={{ padding: '0', textAlign: 'center', backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', opacity: 0.7, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ backgroundColor: 'var(--bg-card)', fontSize: '0.7rem', padding: '0.35rem' }}>{prepStart}</div>
-                    <div style={{ padding: '0.85rem' }}>
-                      <div style={{ fontWeight: 700, fontSize: '1.2rem', textDecoration: 'line-through' }}>{classStart}</div>
-                      <span style={{ display: 'block', fontSize: '0.7rem' }}>Indisponível</span>
+                  <div key={idx} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', opacity: 0.6, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 700, fontSize: '1.1rem', textDecoration: 'line-through', marginBottom: '0.2rem' }}>
+                      {prepStart} — {classEnd}
                     </div>
+                    <span style={{ display: 'block', fontSize: '0.75rem' }}>Indisponível</span>
                   </div>
                 )
               })}

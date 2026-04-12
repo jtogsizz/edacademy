@@ -7,6 +7,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import { cookies } from 'next/headers'
 import AdminCancellationControls from './AdminCancellationControls'
+import { getUnifiedTeacherAgenda } from '@/utils/agendaUtils'
 
 export default async function TeacherAgendaPage() {
   const supabase = await createClient()
@@ -35,7 +36,6 @@ export default async function TeacherAgendaPage() {
       teacher:profiles!appointments_teacher_id_fkey ( id, full_name ),
       student:profiles!appointments_student_id_fkey ( id, full_name, whatsapp_number )
     `)
-    .eq('status', 'scheduled')
     .order('start_time', { ascending: true })
 
   if (!isAdminMaster) {
@@ -63,67 +63,19 @@ export default async function TeacherAgendaPage() {
 
   const { data: recurringClasses } = await recurringQuery
 
-  // Expandir recorrências nos próximos 30 dias
-  const today = startOfDay(new Date())
-  const endLimit = addDays(today, 30)
-  const expandedRecurring: any[] = []
+  // 3. Unificar e ordenar usando a lógica centralizada
+  const allAppointments = getUnifiedTeacherAgenda(
+    user.id,
+    recurringClasses || [],
+    appointments || [],
+    30
+  )
 
-  for (const rec of (recurringClasses || [])) {
-    const [sh, sm] = rec.start_time.split(':').map(Number)
-    const [eh, em] = rec.end_time.split(':').map(Number)
-    
-    const nowUTC = new Date()
-    let currentUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(), sh, sm, 0, 0))
-    
-    // Align to the specific day of week in UTC
-    while (currentUTC.getUTCDay() !== rec.day_of_week) {
-       currentUTC = new Date(currentUTC.getTime() + 24 * 3600 * 1000)
-    }
-    
-    // If it's too far in the past, push it to this week
-    if (currentUTC.getTime() < nowUTC.getTime() - 7 * 24 * 3600 * 1000) {
-       currentUTC = new Date(currentUTC.getTime() + 7 * 24 * 3600 * 1000)
-    }
-
-    const endLimitUTC = new Date(nowUTC.getTime() + 30 * 24 * 3600 * 1000)
-
-    while (currentUTC.getTime() < endLimitUTC.getTime()) {
-      const instanceStart = new Date(currentUTC.getTime())
-      const instanceEnd = new Date(currentUTC.getTime())
-      instanceEnd.setUTCHours(eh, em, 0, 0)
-
-      // Manter visível até o término (inclui aulas em andamento)
-      if (instanceEnd > new Date()) {
-        // Verificar se já existe appointment pontual nesse horário (cancelamento ou remarcação)
-        const hasOverride = (appointments || []).some(
-          a => a.teacher_id === rec.teacher_id && new Date(a.start_time).getTime() === instanceStart.getTime()
-        )
-        if (!hasOverride) {
-          expandedRecurring.push({
-            id: `rec-${rec.id}-${instanceStart.toISOString()}`,
-            start_time: instanceStart.toISOString(),
-            end_time: instanceEnd.toISOString(),
-            status: 'scheduled',
-            teacher: rec.teacher,
-            student: rec.student,
-            is_recurring: true
-          })
-        }
-      }
-      currentUTC = new Date(currentUTC.getTime() + 7 * 24 * 3600 * 1000)
-    }
-  }
-
-  // 3. Unificar e ordenar
-  const allAppointments = [
-    ...(appointments || []).map((a: any) => ({ ...a, is_recurring: false })),
-    ...expandedRecurring
-  ].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-
-  // Filtrar apenas futuros (a partir de hoje)
+  // Filtrar apenas futuros (a partir do momento atual real)
+  const nowMoment = new Date()
   const upcomingApts = allAppointments.filter(apt => {
     const end = new Date(apt.end_time)
-    return end >= today
+    return end >= nowMoment
   })
 
   // 4. Buscar link da aula
@@ -163,23 +115,39 @@ export default async function TeacherAgendaPage() {
             
             // Tratamento nativo do frontend sem afetar a database
             const displayStart = new Date(start.getTime() + 10 * 60 * 1000)
+            const isCancelled = apt.status === 'cancelled'
 
             return (
-              <div key={apt.id} className="card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', borderLeft: `5px solid ${apt.is_recurring ? 'var(--primary)' : 'var(--success)'}` }}>
+              <div 
+                key={apt.id} 
+                className="card" 
+                style={{ 
+                  padding: '1.5rem', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  flexWrap: 'wrap', 
+                  gap: '1.5rem', 
+                  borderLeft: isCancelled ? '5px solid var(--text-muted)' : `5px solid ${apt.is_recurring ? 'var(--primary)' : '#EAB308'}`,
+                  opacity: isCancelled ? 0.6 : 1,
+                  backgroundColor: isCancelled ? 'var(--bg-main)' : (apt.is_recurring ? 'var(--bg-card)' : 'rgba(234, 179, 8, 0.05)'),
+                  filter: isCancelled ? 'grayscale(0.5)' : 'none'
+                }}
+              >
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                   <div style={{ textAlign: 'center', minWidth: '80px', borderRight: '1px solid var(--border)', paddingRight: '1.5rem' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                       {formatInTimeZone(start, userTz, 'EEE', { locale: ptBR })}
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: isCancelled ? 'var(--text-muted)' : 'var(--primary)' }}>
                       {formatInTimeZone(start, userTz, 'dd/MM')}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: apt.is_recurring ? 'var(--primary)' : 'var(--success)', textTransform: 'uppercase', marginBottom: '0.2rem', letterSpacing: '0.05em' }}>
-                      {apt.is_recurring ? 'Aula Fixa' : 'Extra / Reposição'}
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: isCancelled ? 'var(--error)' : (apt.is_recurring ? 'var(--primary)' : '#CA8A04'), textTransform: 'uppercase', marginBottom: '0.2rem', letterSpacing: '0.05em' }}>
+                      {isCancelled ? '● CANCELADA / REMARCADA' : (apt.is_recurring ? 'Aula Fixa' : 'Extra / Reposição')}
                     </div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.2rem' }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.2rem', textDecoration: isCancelled ? 'line-through' : 'none' }}>
                         <>{formatInTimeZone(displayStart, userTz, 'HH:mm')} - {formatInTimeZone(end, userTz, 'HH:mm')}</>
                         <span style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '6px', fontWeight: 'normal'}}>
                           {!isFallback ? '(seu fuso)' : '(padrão BR)'}
@@ -209,16 +177,22 @@ export default async function TeacherAgendaPage() {
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Ações Administrativas</div>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                      <AdminCancellationControls appointmentId={apt.id} type="single" />
-                      <a
-                        href={canEnter ? meetLink : '#'}
-                        target={canEnter ? "_blank" : undefined}
-                        rel={canEnter ? "noopener noreferrer" : undefined}
-                        className={`btn-primary ${!canEnter && 'disabled'}`}
-                        style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
-                      >
-                        {isOngoing ? 'Entrar Agora' : canEnter ? 'Sala aberta' : 'Em breve'}
-                      </a>
+                      {isCancelled ? (
+                         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, padding: '0.6rem 1.2rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>Indisponível</span>
+                      ) : (
+                        <>
+                          <AdminCancellationControls appointmentId={apt.id} type="single" />
+                          <a
+                            href={canEnter ? meetLink : '#'}
+                            target={canEnter ? "_blank" : undefined}
+                            rel={canEnter ? "noopener noreferrer" : undefined}
+                            className={`btn-primary ${!canEnter && 'disabled'}`}
+                            style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
+                          >
+                            {isOngoing ? 'Entrar Agora' : canEnter ? 'Sala aberta' : 'Em breve'}
+                          </a>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

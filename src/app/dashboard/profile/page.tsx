@@ -215,17 +215,23 @@ export default async function StudentProfilePage() {
               {recurring && recurring.length > 0 ? (
                 recurring.map(r => {
                   const [h, m] = r.start_time.split(':').map(Number)
-                  // Build a deterministic UTC Date for this recurring slot
-                  const utcBase = new Date(Date.UTC(2000, 0, -5 + r.day_of_week, h, m, 0))
+                  // Build a deterministic UTC Date for this recurring slot using the current year/month to avoid DST issues from year 2000
+                  const now = new Date()
+                  const utcBase = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, m, 0))
                   
-                  // Apply 10 mins rule
-                  const utcClassBase = new Date(utcBase.getTime() + 10 * 60 * 1000)
+                  // Adjust to display the correct day of week in the browser's context
+                  while (utcBase.getUTCDay() !== r.day_of_week) {
+                    utcBase.setUTCDate(utcBase.getUTCDate() + 1)
+                  }
+                  
+                  // Apply 10 mins rule - Always standardize display to class start (+10min)
+                  const displayStart = new Date(utcBase.getTime() + 10 * 60 * 1000)
                   
                   return (
                     <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                       <div>
                         <div style={{ fontWeight: 600, color: 'var(--primary)', textTransform: 'capitalize' }}>
-                          {formatInTimeZone(utcClassBase, userTz, "EEEE, HH:mm", { locale: ptBR })}
+                          {formatInTimeZone(displayStart, userTz, "EEEE, HH:mm", { locale: ptBR })}
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Prof. {r.teacher?.full_name}</div>
                       </div>
@@ -260,19 +266,40 @@ export default async function StudentProfilePage() {
             const isOngoing = now >= start && now <= end
             const teacher = apt.teacher
             const displayStart = new Date(start.getTime() + 10 * 60 * 1000)
+            const isCancelled = apt.status === 'cancelled'
 
             return (
-              <div key={apt.id} className="card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', borderLeft: apt.is_recurring ? '4px solid var(--primary)' : '4px solid var(--success)' }}>
+              <div 
+                key={apt.id} 
+                className="card" 
+                style={{ 
+                  padding: '1.2rem', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  flexWrap: 'wrap', 
+                  gap: '1.5rem', 
+                  borderLeft: isCancelled ? '4px solid var(--text-muted)' : `4px solid ${apt.is_recurring ? 'var(--primary)' : '#EAB308'}`,
+                  opacity: isCancelled ? 0.6 : 1,
+                  backgroundColor: isCancelled ? 'var(--bg-main)' : (apt.is_recurring ? 'var(--bg-card)' : 'rgba(234, 179, 8, 0.05)'),
+                  filter: isCancelled ? 'grayscale(1)' : 'none'
+                }}
+              >
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                  <div style={{ textAlign: 'center', minWidth: '45px', borderRight: '1px solid var(--border)', paddingRight: '1rem' }}>
                     <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{formatInTimeZone(start, userTz, 'MMM', { locale: ptBR })}</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{formatInTimeZone(start, userTz, 'dd')}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: isCancelled ? 'var(--text-muted)' : 'var(--primary)' }}>{formatInTimeZone(start, userTz, 'dd')}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
-                      {apt.is_recurring ? 'AULA FIXA DO PLANO' : 'AULA DE REPOSIÇÃO / EXTRA'}
+                    <div style={{ 
+                      fontSize: '0.75rem', 
+                      color: isCancelled ? 'var(--error)' : (apt.is_recurring ? 'var(--text-muted)' : '#CA8A04'), 
+                      marginBottom: '0.2rem', 
+                      fontWeight: (isCancelled || !apt.is_recurring) ? 700 : 400 
+                    }}>
+                      {isCancelled ? '● AULA CANCELADA / REMARCADA' : (apt.is_recurring ? 'AULA FIXA DO PLANO' : 'AULA DE REPOSIÇÃO / EXTRA')}
                     </div>
-                    <div style={{ fontWeight: 600 }}>
+                    <div style={{ fontWeight: 600, textDecoration: isCancelled ? 'line-through' : 'none' }}>
                       <>{formatInTimeZone(displayStart, userTz, 'HH:mm')} - {formatInTimeZone(end, userTz, 'HH:mm')} <span style={{fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px'}}>{!isFallback ? '(seu fuso)' : '(padrão BR)'}</span></>
                     </div>
                     <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Prof. {teacher?.full_name}</div>
@@ -280,24 +307,30 @@ export default async function StudentProfilePage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  {!isOngoing && (
-                    <Link 
-                      href={`/dashboard/schedule?teacher_id=${teacher?.id}&reschedule_id=${apt.id}`}
-                      className="btn-outline"
-                      style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem', fontSize: '0.85rem', textDecoration: 'none' }}
-                    >
-                      Remarcar
-                    </Link>
+                  {isCancelled ? (
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>Indisponível</span>
+                  ) : (
+                    <>
+                      {!isOngoing && (
+                        <Link 
+                          href={`/dashboard/schedule?teacher_id=${teacher?.id}&reschedule_id=${apt.id}`}
+                          className="btn-outline"
+                          style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem', fontSize: '0.85rem', textDecoration: 'none' }}
+                        >
+                          Remarcar
+                        </Link>
+                      )}
+                      <a 
+                        href={canEnter ? meetLink : '#'}
+                        target={canEnter ? "_blank" : undefined}
+                        rel={canEnter ? "noopener noreferrer" : undefined}
+                        className={`btn-primary ${!canEnter && 'disabled'}`}
+                        style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
+                      >
+                        {isOngoing ? 'Entrar na Aula' : canEnter ? 'Sala aberta' : 'Aula inicia em breve'}
+                      </a>
+                    </>
                   )}
-                  <a 
-                    href={canEnter ? meetLink : '#'}
-                    target={canEnter ? "_blank" : undefined}
-                    rel={canEnter ? "noopener noreferrer" : undefined}
-                    className={`btn-primary ${!canEnter && 'disabled'}`}
-                    style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
-                  >
-                    {isOngoing ? 'Entrar na Aula' : canEnter ? 'Sala aberta' : 'Aula inicia em breve'}
-                  </a>
                 </div>
               </div>
             )

@@ -28,19 +28,9 @@ export function getUnifiedStudentAgenda(
   const today = startOfDay(new Date())
   const endLimit = addDays(today, daysAhead)
 
-  // 1. Adicionar agendamentos manuais (remarcações/extras)
-  for (const apt of oneOffAppointments) {
-    agenda.push({
-      id: apt.id,
-      start_time: apt.start_time,
-      end_time: apt.end_time,
-      status: apt.status,
-      teacher: apt.teacher,
-      is_recurring: false
-    })
-  }
+  // 1. Expandir recorrências primeiro (âncora da agenda)
+  const consumedIds = new Set<string>()
 
-  // 2. Expandir recorrências
   for (const rec of recurringClasses) {
     // Usar lógica estrita em UTC
     const [h, m, s] = rec.start_time.split(':').map(Number)
@@ -70,12 +60,19 @@ export function getUnifiedStudentAgenda(
 
       const instanceStartISO = instanceStart.toISOString()
 
-      // Verificar se essa data específica já tem um appointment manual que sobrescreve
-      // (Se houver um appointment no mesmo start_time, ele "vence" a recorrência)
-      const override = oneOffAppointments.find(a => a.start_time === instanceStartISO)
+      // Procurar override (remarcação ou cancelamento) para este slot específico
+      const override = oneOffAppointments.find(a => 
+        new Date(a.start_time).getTime() === instanceStart.getTime() &&
+        a.teacher_id === rec.teacher_id
+      )
 
-      // Manter visível até o término da aula (não só enquanto não começou)
-      if (!override && instanceEnd > new Date()) {
+      if (override) {
+        agenda.push({
+          ...override,
+          is_recurring: true
+        })
+        consumedIds.add(override.id)
+      } else if (instanceEnd > new Date()) {
         agenda.push({
           id: `rec-${rec.id}-${instanceStartISO}`,
           start_time: instanceStartISO,
@@ -90,7 +87,103 @@ export function getUnifiedStudentAgenda(
     }
   }
 
+  // 2. Adicionar agendamentos manuais (extras/reposição) não consumidos
+  for (const apt of oneOffAppointments) {
+    if (!consumedIds.has(apt.id)) {
+      if (apt.status === 'scheduled') {
+        agenda.push({
+          ...apt,
+          is_recurring: false
+        })
+      }
+    }
+  }
+
   // Ordenar cronologicamente
+  return agenda.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+}
+
+/**
+ * Expande a regra de recorrência para o PROFESSOR.
+ */
+export function getUnifiedTeacherAgenda(
+  teacherId: string,
+  recurringClasses: any[],
+  oneOffAppointments: any[],
+  daysAhead: number = 30
+): any[] {
+  const agenda: any[] = []
+  const today = startOfDay(new Date())
+  const endLimit = addDays(today, daysAhead)
+  const consumedIds = new Set<string>()
+
+  // 1. Expandir recorrências primeiro (âncora da agenda)
+  for (const rec of recurringClasses) {
+    const [h, m, s] = rec.start_time.split(':').map(Number)
+    const [eh, em, es] = rec.end_time.split(':').map(Number)
+    
+    const nowUTC = new Date()
+    let currentUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(), h, m, s || 0, 0))
+    
+    while (currentUTC.getUTCDay() !== rec.day_of_week) {
+      currentUTC = new Date(currentUTC.getTime() + 24 * 60 * 60 * 1000)
+    }
+
+    if (currentUTC.getTime() < nowUTC.getTime() - 7 * 24 * 60 * 60 * 1000) {
+      currentUTC = new Date(currentUTC.getTime() + 7 * 24 * 60 * 60 * 1000)
+    }
+
+    const endLimitUTC = new Date(nowUTC.getTime() + daysAhead * 24 * 60 * 60 * 1000)
+
+    while (currentUTC.getTime() < endLimitUTC.getTime()) {
+      const instanceStart = new Date(currentUTC.getTime())
+      const instanceEnd = new Date(currentUTC.getTime())
+      instanceEnd.setUTCHours(eh, em, es || 0, 0)
+
+      // Verificar override usando TIMESTAMP
+      const override = oneOffAppointments.find(a => 
+        new Date(a.start_time).getTime() === instanceStart.getTime() && 
+        a.teacher_id === rec.teacher_id
+      )
+
+      if (override) {
+        // Se houver override (ativo ou cancelado), usamos ele
+        agenda.push({
+          ...override,
+          is_recurring: true
+        })
+        consumedIds.add(override.id)
+      } else if (instanceEnd > new Date()) {
+        // Aula fixa normal ativa
+        agenda.push({
+          id: `rec-${rec.id}-${instanceStart.toISOString()}`,
+          start_time: instanceStart.toISOString(),
+          end_time: instanceEnd.toISOString(),
+          status: 'scheduled',
+          teacher: rec.teacher,
+          student: rec.student,
+          is_recurring: true
+        })
+      }
+
+      currentUTC = new Date(currentUTC.getTime() + 7 * 24 * 60 * 60 * 1000)
+    }
+  }
+
+  // 2. Adicionar agendamentos manuais (extras/reposição) não consumidos
+  for (const apt of oneOffAppointments) {
+    if (!consumedIds.has(apt.id)) {
+      // Apenas adicionamos se for um agendamento extra ativo
+      // Isso elimina os "cancelamentos fantasmas" que não batem com nenhuma regra atual
+      if (apt.status === 'scheduled') {
+        agenda.push({
+          ...apt,
+          is_recurring: false
+        })
+      }
+    }
+  }
+
   return agenda.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 }
 

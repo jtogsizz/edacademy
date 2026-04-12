@@ -2,15 +2,17 @@ import Link from 'next/link'
 import Image from 'next/image'
 import Logo from '@/components/Logo'
 import ProfessorCarousel, { Professor } from '@/components/ProfessorCarousel'
+import InteractiveCards from '@/components/InteractiveCards'
+import ScrollReveal from '@/components/ScrollReveal'
 import fs from 'fs'
 import path from 'path'
 
 export default function Home() {
   // Configuração dos professores com versionamento automático via mtime (timestamp do arquivo)
   const professorsData = [
-    { name: 'Ed', role: 'Prof. Inglês', filename: 'professor1.png' },
-    { name: 'João', role: 'Desenvolvedor', filename: 'professor2.png' },
-    { name: 'Melissa', role: 'Assistente', filename: 'professor3.png' },
+    { name: 'Ed', role: 'English teacher', filename: 'professor1.png' },
+    { name: 'João', role: 'Developer', filename: 'professor2.png' },
+    { name: 'Melissa', role: 'Support', filename: 'professor3.png' },
   ]
 
   const professors: Professor[] = professorsData.map((prof) => {
@@ -37,16 +39,23 @@ export default function Home() {
 
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
 
+      <ScrollReveal />
+
       {/* --- HERO SECTION --- */}
       <section style={{
-        padding: '6rem 1.5rem 4rem',
+        padding: '8rem 1.5rem 6rem',
         textAlign: 'center',
-        background: 'linear-gradient(180deg, #FFFFFF 0%, var(--bg-main) 100%)',
-        borderBottom: '1px solid var(--border)'
+        background: 'radial-gradient(circle at 50% 50%, rgba(234, 88, 12, 0.03) 0%, transparent 60%), linear-gradient(180deg, #FFFFFF 0%, var(--bg-main) 100%)',
+        borderBottom: '1px solid var(--border)',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'center' }}>
-            <Logo width={80} />
+        {/* Elementos Decorativos Interativos (3D + Física) */}
+        <InteractiveCards />
+
+        <div className="container" style={{ maxWidth: '800px', margin: '0 auto', position: 'relative', zIndex: 2 }}>
+          <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center' }}>
+            <Logo width={64} />
           </div>
 
           <h1 style={{
@@ -56,7 +65,8 @@ export default function Home() {
             letterSpacing: '-0.04em',
             background: 'linear-gradient(90deg, var(--text-main) 0%, #4B5563 100%)',
             WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
+            WebkitTextFillColor: 'transparent',
+            textShadow: '0 10px 30px rgba(0,0,0,0.05)'
           }}>
             Evolução real no seu <span style={{ color: 'var(--primary)', WebkitTextFillColor: 'initial' }}>ritmo</span>
           </h1>
@@ -64,7 +74,7 @@ export default function Home() {
           <p style={{
             fontSize: '1.25rem',
             color: 'var(--text-muted)',
-            marginBottom: '3rem',
+            marginBottom: '3.5rem',
             lineHeight: 1.6,
             maxWidth: '600px',
             marginInline: 'auto'
@@ -72,12 +82,12 @@ export default function Home() {
             A EdAcademy une o acompanhamento individualizado à tecnologia para garantir que você atinja seus objetivos com aulas organizadas e eficazes.
           </p>
 
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Link href="/login" className="btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1rem' }}>
-              Acessar Minha Conta
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Link href="/login" className="btn-primary premium-btn" style={{ padding: '1.1rem 2.8rem', fontSize: '1rem' }}>
+              Entrar na minha conta
             </Link>
-            <Link href="/register" className="btn-outline" style={{ padding: '1rem 2.5rem', fontSize: '1rem' }}>
-              Começar Agora
+            <Link href="/register" className="btn-outline premium-btn-outline" style={{ padding: '1.1rem 2.8rem', fontSize: '1rem' }}>
+              Me matricular
             </Link>
           </div>
         </div>
@@ -86,7 +96,7 @@ export default function Home() {
       {/* --- PROFESSOR SECTION --- */}
       <section style={{ padding: '5rem 1.5rem', backgroundColor: '#FFFFFF' }}>
         <div className="container" style={{ maxWidth: '1000px' }}>
-          <div className="card professor-card" style={{
+          <div className="card professor-card neon-border" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(Min(100%, 400px), 1fr))',
             gap: '3rem',
@@ -143,7 +153,7 @@ export default function Home() {
           </div>
 
           {/* Galeria de Fotos Secundária */}
-          <div style={{
+          <div className="reveal neon-border" style={{
             marginTop: '3rem',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -153,7 +163,7 @@ export default function Home() {
             <div style={{ height: '350px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', position: 'relative' }}>
               <Image src="/images/professor/foto2.jpg" alt="Ambiente de aulas" fill sizes="(max-width: 1000px) 100vw, 500px" style={{ objectFit: 'cover' }} />
             </div>
-            
+
             <div style={{ padding: '1rem' }}>
               <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', fontWeight: 700 }}>Nossa História</h3>
               <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, fontSize: '1rem', marginBottom: '1.2rem' }}>
@@ -173,10 +183,52 @@ export default function Home() {
         .professor-card {
           padding: 4rem;
         }
+        .floating-card {
+          position: absolute;
+          padding: 12px 16px;
+          border-radius: 16px;
+          box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1);
+          z-index: 1;
+          pointer-events: none;
+        }
+        .glass-effect {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .premium-btn {
+          box-shadow: 0 10px 20px -5px rgba(234, 88, 12, 0.3);
+        }
+        .premium-btn:hover {
+          box-shadow: 0 15px 25px -5px rgba(234, 88, 12, 0.4);
+          transform: translateY(-2px) scale(1.02);
+        }
+        .premium-btn-outline {
+          background: white;
+        }
+        .premium-btn-outline:hover {
+          background: var(--bg-hover);
+          transform: translateY(-2px);
+        }
+        .reveal {
+          opacity: 0;
+          transform: translateY(30px);
+          transition: opacity 1.2s cubic-bezier(0.5, 0, 0, 1), transform 1.2s cubic-bezier(0.5, 0, 0, 1);
+          will-change: opacity, transform;
+        }
+        .reveal.active {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        .neon-border {
+          outline: 1px solid rgba(234, 88, 12, 0.2) !important;
+          outline-offset: -1px;
+          box-shadow: 0 0 15px rgba(234, 88, 12, 0.1) !important;
+        }
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
           .container { padding: 0 1.25rem; }
-          section { padding: 3.5rem 1rem !important; }
+          section { padding: 4.5rem 1rem !important; }
           .professor-card { padding: 2.5rem 1.5rem !important; gap: 2rem !important; }
           .mobile-center { text-align: center !important; }
           .mobile-center ul { display: inline-block; text-align: left; }
