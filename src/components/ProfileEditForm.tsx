@@ -1,17 +1,23 @@
 "use client"
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
+import { AVAILABLE_TIMEZONES } from '@/utils/timezones'
 
 interface ProfileEditFormProps {
   initialFullName: string
   initialWhatsapp: string
   initialInstagram?: string
+  initialTimezone?: string
+  initialLanguage?: string
   isReadOnly?: boolean
   isAvatarUploading?: boolean
+  userRole?: string
   saveAction: (
     fullName: string,
     whatsapp: string,
-    instagram?: string
+    instagram?: string,
+    timezone?: string,
+    language?: string
   ) => Promise<{ success?: boolean; error?: string }>
 }
 
@@ -19,13 +25,30 @@ export default function ProfileEditForm({
   initialFullName,
   initialWhatsapp,
   initialInstagram,
+  initialTimezone,
+  initialLanguage,
   isReadOnly = false,
   isAvatarUploading = false,
+  userRole,
   saveAction,
 }: ProfileEditFormProps) {
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Detecção fallback apenas se não houver inicial gravado
+  const [detectedTimezone, setDetectedTimezone] = useState<string>('America/Sao_Paulo')
+  
+  // Detecção fallback apenas se não houver inicial gravado
+  useEffect(() => {
+    if (!initialTimezone && detectedTimezone === 'America/Sao_Paulo') {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const tzExists = AVAILABLE_TIMEZONES.some(t => t.value === tz)
+        if (tz && tzExists) setDetectedTimezone(tz)
+      } catch {}
+    }
+  }, [initialTimezone, detectedTimezone])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -35,13 +58,15 @@ export default function ProfileEditForm({
     const fullName = formData.get('fullName') as string
     const whatsapp = formData.get('whatsapp') as string
     const instagram = (formData.get('instagram') as string) || undefined
+    const timezone = (formData.get('timezone') as string) || undefined
+    const language = (formData.get('language') as string) || undefined
 
     setSuccess(false)
     setError(null)
 
     startTransition(async () => {
       try {
-        const res = await saveAction(fullName, whatsapp, instagram)
+        const res = await saveAction(fullName, whatsapp, instagram, timezone, language)
         if (res?.error) {
           setError(res.error)
         } else {
@@ -104,6 +129,47 @@ export default function ProfileEditForm({
             disabled={isPending || isReadOnly || isAvatarUploading}
             style={fieldStyle}
           />
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Fuso Horário
+        </label>
+        <select
+          name="timezone"
+          defaultValue={initialTimezone || detectedTimezone}
+          disabled={isPending || isReadOnly || isAvatarUploading}
+          style={fieldStyle}
+        >
+          {AVAILABLE_TIMEZONES.map(tz => (
+            <option key={tz.value} value={tz.value}>{tz.label}</option>
+          ))}
+        </select>
+        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          Altere se as notificações de aulas parecerem erradas para sua região.
+        </div>
+      </div>
+
+      {initialLanguage !== undefined && (userRole === 'admin' || userRole === 'admin_master') && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            Idioma Principal de Ensino
+          </label>
+          <select
+            name="language"
+            defaultValue={initialLanguage}
+            disabled={isPending || isReadOnly || isAvatarUploading}
+            style={fieldStyle}
+          >
+            <option value="">Não definido</option>
+            <option value="english">Inglês</option>
+            <option value="spanish">Espanhol</option>
+          </select>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            Este idioma será usado para encaminhar alunos correspondentes para você.
+          </div>
         </div>
       )}
 

@@ -146,27 +146,26 @@ export default function Home() {
           <div style={{
             marginTop: '3rem',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1.5rem'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '2rem',
+            alignItems: 'center'
           }}>
-            <div style={{ height: '240px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', position: 'relative' }}>
-              <Image src="/images/professor/foto2.jpg" alt="Ambiente de aulas" fill sizes="(max-width: 1000px) 100vw, 300px" style={{ objectFit: 'cover' }} />
+            <div style={{ height: '350px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', position: 'relative' }}>
+              <Image src="/images/professor/foto2.jpg" alt="Ambiente de aulas" fill sizes="(max-width: 1000px) 100vw, 500px" style={{ objectFit: 'cover' }} />
             </div>
-            <div style={{ height: '240px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', position: 'relative' }}>
-              <Image src="/images/professor/foto3.jpg" alt="Processo de ensino" fill sizes="(max-width: 1000px) 100vw, 300px" style={{ objectFit: 'cover' }} />
-            </div>
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', backgroundColor: 'var(--primary-light)', border: '1px dashed var(--primary)', padding: '2rem' }}>
-              <h4 style={{ color: 'var(--primary)', marginBottom: '0.5rem', fontWeight: 700 }}>Vamos começar?</h4>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-main)' }}>Sua primeira aula está a um clique de distância.</p>
-              <Link href="/register" style={{ marginTop: '1rem', color: 'var(--primary)', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'underline' }}>
-                Quero me matricular
-              </Link>
+            
+            <div style={{ padding: '1rem' }}>
+              <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', fontWeight: 700 }}>Nossa História</h3>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, fontSize: '1rem', marginBottom: '1.2rem' }}>
+                Sou o Ed, professor de inglês e espanhol e fundador da Ed's Academy. Minha paixão por idiomas começou durante minhas primeiras viagens internacionais, especialmente para Argentina e Uruguai, onde percebi como o inglês me permitia me conectar com pessoas de diferentes culturas.
+              </p>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, fontSize: '1rem' }}>
+                A partir dessa experiência, decidi ensinar idiomas de forma prática e focada na comunicação real. Hoje, levo essa mesma abordagem aos meus alunos, ajudando cada um a ganhar confiança para se comunicar no mundo.
+              </p>
             </div>
           </div>
         </div>
       </section>
-
-
 
       {/* --- ESTILOS ADICIONAIS --- */}
       <style dangerouslySetInnerHTML={{

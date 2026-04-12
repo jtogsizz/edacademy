@@ -3,18 +3,25 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import { format, addDays, addWeeks, getDay, startOfDay, isBefore } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
+import { cookies } from 'next/headers'
 import AdminCancellationControls from './AdminCancellationControls'
 
 export default async function TeacherAgendaPage() {
   const supabase = await createClient()
+  const cookieStore = await cookies()
+  const clientTz = cookieStore.get('client_tz')?.value
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('id, role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('id, role, timezone').eq('id', user.id).single()
   if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
 
   const isAdminMaster = profile?.role === 'admin_master'
+
+  const userTz = profile?.timezone || clientTz || 'America/Sao_Paulo'
+  const isFallback = !profile?.timezone && !clientTz
 
   // 1. Appointments pontuais (remarcações, extras)
   let appointmentsQuery = supabase
@@ -62,18 +69,28 @@ export default async function TeacherAgendaPage() {
   const expandedRecurring: any[] = []
 
   for (const rec of (recurringClasses || [])) {
-    let current = today
-    while (getDay(current) !== rec.day_of_week) {
-      current = addDays(current, 1)
+    const [sh, sm] = rec.start_time.split(':').map(Number)
+    const [eh, em] = rec.end_time.split(':').map(Number)
+    
+    const nowUTC = new Date()
+    let currentUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(), sh, sm, 0, 0))
+    
+    // Align to the specific day of week in UTC
+    while (currentUTC.getUTCDay() !== rec.day_of_week) {
+       currentUTC = new Date(currentUTC.getTime() + 24 * 3600 * 1000)
     }
-    while (isBefore(current, endLimit)) {
-      const [sh, sm] = rec.start_time.split(':').map(Number)
-      const instanceStart = new Date(current)
-      instanceStart.setHours(sh, sm, 0, 0)
+    
+    // If it's too far in the past, push it to this week
+    if (currentUTC.getTime() < nowUTC.getTime() - 7 * 24 * 3600 * 1000) {
+       currentUTC = new Date(currentUTC.getTime() + 7 * 24 * 3600 * 1000)
+    }
 
-      const [eh, em] = rec.end_time.split(':').map(Number)
-      const instanceEnd = new Date(current)
-      instanceEnd.setHours(eh, em, 0, 0)
+    const endLimitUTC = new Date(nowUTC.getTime() + 30 * 24 * 3600 * 1000)
+
+    while (currentUTC.getTime() < endLimitUTC.getTime()) {
+      const instanceStart = new Date(currentUTC.getTime())
+      const instanceEnd = new Date(currentUTC.getTime())
+      instanceEnd.setUTCHours(eh, em, 0, 0)
 
       // Manter visível até o término (inclui aulas em andamento)
       if (instanceEnd > new Date()) {
@@ -93,7 +110,7 @@ export default async function TeacherAgendaPage() {
           })
         }
       }
-      current = addWeeks(current, 1)
+      currentUTC = new Date(currentUTC.getTime() + 7 * 24 * 3600 * 1000)
     }
   }
 
@@ -143,22 +160,30 @@ export default async function TeacherAgendaPage() {
             const canEnter = now >= earlyEntry && now <= end
             const isOngoing = now >= start && now <= end
             const student = apt.student
+            
+            // Tratamento nativo do frontend sem afetar a database
+            const displayStart = new Date(start.getTime() + 10 * 60 * 1000)
 
             return (
               <div key={apt.id} className="card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', borderLeft: `5px solid ${apt.is_recurring ? 'var(--primary)' : 'var(--success)'}` }}>
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                   <div style={{ textAlign: 'center', minWidth: '80px', borderRight: '1px solid var(--border)', paddingRight: '1.5rem' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      {format(start, 'EEE', { locale: ptBR })}
+                      {formatInTimeZone(start, userTz, 'EEE', { locale: ptBR })}
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{format(start, 'dd/MM')}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
+                      {formatInTimeZone(start, userTz, 'dd/MM')}
+                    </div>
                   </div>
                   <div>
                     <div style={{ fontSize: '0.7rem', fontWeight: 600, color: apt.is_recurring ? 'var(--primary)' : 'var(--success)', textTransform: 'uppercase', marginBottom: '0.2rem', letterSpacing: '0.05em' }}>
                       {apt.is_recurring ? 'Aula Fixa' : 'Extra / Reposição'}
                     </div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.2rem' }}>
-                      {format(start, 'HH:mm')} - {format(end, 'HH:mm')}
+                        <>{formatInTimeZone(displayStart, userTz, 'HH:mm')} - {formatInTimeZone(end, userTz, 'HH:mm')}</>
+                        <span style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '6px', fontWeight: 'normal'}}>
+                          {!isFallback ? '(seu fuso)' : '(padrão BR)'}
+                        </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{student?.full_name}</span>

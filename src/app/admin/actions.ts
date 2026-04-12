@@ -1,24 +1,43 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
 
 
 export async function changeUserRole(targetUserId: string, newRole: 'student' | 'admin') {
+  console.log(`[changeUserRole] Reversão: Chamado para usuário ${targetUserId} com novo cargo: ${newRole}`)
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-  
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  // Somente ADMIN MASTER pode promover ou rebaixar membros
-  if (profile?.role !== 'admin_master') return
 
-  await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    console.error('[changeUserRole] Usuário não autenticado')
+    return
+  }
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  console.log(`[changeUserRole] Role do executor (${user.id}): ${profile?.role}`)
+
+  // Somente ADMIN MASTER pode promover ou rebaixar membros
+  if (profile?.role !== 'admin_master') {
+    console.warn('[changeUserRole] Tentativa de mudança de cargo por usuário não Master negada.')
+    return
+  }
+
+  // Volta para o modelo estável: Update direto via Supabase Client
+  const { error } = await supabase
     .from('profiles')
-    .update({ role: newRole })
+    .update({
+      role: newRole,
+      updated_at: new Date().toISOString()
+    })
     .eq('id', targetUserId)
+
+  if (error) {
+    console.error('[Action: changeUserRole] Erro na gravação direta:', error)
+    throw new Error(error.message)
+  }
 
   revalidatePath('/admin/profile')
 }
@@ -28,8 +47,8 @@ export async function changeUserRole(targetUserId: string, newRole: 'student' | 
  * Registra o histórico da alteração para auditoria.
  */
 export async function updateSubscriptionManual(
-  studentId: string, 
-  status: 'active' | 'inactive', 
+  studentId: string,
+  status: 'active' | 'inactive',
   endDate: string | null,
   notes?: string
 ) {
@@ -44,7 +63,7 @@ export async function updateSubscriptionManual(
     .from('subscriptions')
     .select('*')
     .eq('student_id', studentId)
-    .single()
+    .maybeSingle()
 
   // 2. Atualizar assinatura
   // Regra futura: bloquear ativação sem idioma definido
@@ -55,17 +74,33 @@ export async function updateSubscriptionManual(
     }
   }
 
-  const { error } = await supabase
-    .from('subscriptions')
-    .update({ 
-      status, 
-      end_date: endDate || null,
-      notes: notes || null,
-      updated_at: new Date().toISOString()
-    })
-    .eq('student_id', studentId)
+  const payload = {
+    student_id: studentId,
+    status,
+    end_date: endDate || null,
+    notes: notes || null,
+    updated_at: new Date().toISOString()
+  }
 
-  if (error) throw error
+  let updateError
+  if (currentSub) {
+    const { error } = await supabase.from('subscriptions').update(payload).eq('student_id', studentId)
+    updateError = error
+  } else {
+    const { error } = await supabase.from('subscriptions').insert(payload)
+    updateError = error
+  }
+
+  if (updateError) {
+    console.error('[Action: updateSubscriptionManual] Erro ao salvar sub:', updateError)
+    throw updateError
+  }
+
+  // FIX: Sincroniza ativamente a permissão de painel/roteamento
+  const { error: profileError } = await supabase.from('profiles').update({ is_active: status === 'active' }).eq('id', studentId)
+  if (profileError) {
+    console.error('[Action: updateSubscriptionManual] Erro ao sincronizar is_active:', profileError)
+  }
 
   // 3. Gerar Log de Alteração
   if (currentSub) {
@@ -80,6 +115,7 @@ export async function updateSubscriptionManual(
     })
   }
 
+  console.log(`[updateSubscriptionManual] Sucesso para aluno ${studentId}`)
   revalidatePath('/admin/profile')
 }
 
@@ -87,34 +123,69 @@ export async function updateSubscriptionManual(
  * Alterna o status da assinatura e registra no histórico.
  */
 export async function toggleSubscriptionStatus(studentId: string, currentStatus: string) {
+  console.log(`[toggleSubscriptionStatus] Início: Aluno ${studentId}, Status Atual Informado: ${currentStatus}`)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+  if (!user) {
+    console.warn('[toggleSubscriptionStatus] Não autenticado')
+    return
+  }
+
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  
+  console.log(`[toggleSubscriptionStatus] Executado por: ${user.id} (Role: ${profile?.role})`)
+
   // Somente ADMIN ou ADMIN MASTER podem alternar status
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'admin_master'
-  if (!isAuthorized) return
+  if (!isAuthorized) {
+    console.warn('[toggleSubscriptionStatus] Acesso negado')
+    return
+  }
 
   const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
+  console.log(`[toggleSubscriptionStatus] Novo Status planejado: ${newStatus}`)
 
-  // Regra futura: bloquear ativação sem idioma definido
+  // Regra: bloquear ativação sem idioma definido
   if (newStatus === 'active') {
     const { data: studentProf } = await supabase.from('profiles').select('student_language').eq('id', studentId).single()
     if (!studentProf?.student_language) {
-      return { error: 'Defina o idioma do aluno antes de ativar o plano.' }
+      console.warn(`[toggleSubscriptionStatus] Bloqueado: Aluno ${studentId} sem idioma definido.`)
+      return { error: 'Defina o idioma do aluno (Inglês/Espanhol) antes de liberar o acesso.' }
     }
   }
-  
+
   const { data: currentSub } = await supabase
     .from('subscriptions')
     .select('*')
     .eq('student_id', studentId)
-    .single()
+    .maybeSingle()
 
-  await supabase.from('subscriptions').update({ status: newStatus }).eq('student_id', studentId)
+  const payload = {
+    student_id: studentId,
+    status: newStatus,
+    updated_at: new Date().toISOString()
+  }
 
-  // Gerar Log
+  let subError
+  if (currentSub) {
+    const { error } = await supabase.from('subscriptions').update(payload).eq('student_id', studentId)
+    subError = error
+  } else {
+    const { error } = await supabase.from('subscriptions').insert(payload)
+    subError = error
+  }
+
+  if (subError) {
+    console.error('[toggleSubscriptionStatus] Erro ao atualizar/inserir subscriptions:', subError)
+    return { error: 'Database error: ' + subError.message }
+  }
+
+  // FIX: Sincroniza ativamente a permissão da plataforma
+  const { error: profError } = await supabase.from('profiles').update({ is_active: newStatus === 'active' }).eq('id', studentId)
+  if (profError) {
+    console.error('[toggleSubscriptionStatus] Erro ao sincronizar profiles.is_active:', profError)
+  }
+
+  // Gerar Log se houver assinatura prévia
   if (currentSub) {
     await supabase.from('subscription_change_logs').insert({
       subscription_id: currentSub.id,
@@ -123,10 +194,11 @@ export async function toggleSubscriptionStatus(studentId: string, currentStatus:
       new_status: newStatus,
       old_end_date: currentSub.end_date,
       new_end_date: currentSub.end_date,
-      notes: `Toggle rápido para ${newStatus === 'active' ? 'Ativo' : 'Inativo'}`
+      notes: `Toggle rápido via Admin para ${newStatus}`
     })
   }
 
+  console.log(`[toggleSubscriptionStatus] Sucesso para aluno ${studentId}`)
   revalidatePath('/admin/profile')
 }
 
@@ -183,4 +255,59 @@ export async function updateAdminProfile(fullName: string, whatsapp: string, ins
 
   if (error) throw error
   revalidatePath('/admin/profile')
+}
+
+export async function deleteUserAccount(targetUserId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin_master') return { error: 'Acesso restrito' }
+
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) return { error: 'Chave de serviço ausente no ambiente.' }
+
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceKey,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  try {
+    // 1. Limpeza segura preditiva com Service Key (Master bypasses RLS) para evitar 'Database error deleting user'
+    // O erro 'Database error deleting user' vem do GoTrue falhando frente a Foreign Keys sem ON DELETE CASCADE na DB.
+
+    // A: Agenda (participação como aluno ou como professor)
+    await supabaseAdmin.from('appointments').delete().or(`student_id.eq.${targetUserId},teacher_id.eq.${targetUserId}`)
+    await supabaseAdmin.from('recurring_classes').delete().or(`student_id.eq.${targetUserId},teacher_id.eq.${targetUserId}`)
+
+    // B: Mensagens
+    await supabaseAdmin.from('messages').delete().or(`sender_id.eq.${targetUserId},receiver_id.eq.${targetUserId}`)
+
+    // C: Assinaturas e Logs
+    await supabaseAdmin.from('subscription_change_logs').delete().eq('admin_id', targetUserId)
+    await supabaseAdmin.from('subscriptions').delete().eq('student_id', targetUserId)
+
+    // D: Deletar objetos do storage atrelados a ele (se houver, impede deletar conta)
+    const { data: targetProfile } = await supabaseAdmin.from('profiles').select('avatar_url').eq('id', targetUserId).single()
+    if (targetProfile?.avatar_url) {
+      const fileName = targetProfile.avatar_url.split('/').pop()
+      if (fileName) {
+        await supabaseAdmin.storage.from('avatars').remove([`${targetUserId}/${fileName}`])
+        await supabaseAdmin.storage.from('avatars').remove([fileName]) // fallback se não tiver folder
+      }
+    }
+
+    // E: Finalmente remover Perfil e o Auth do DB.
+    await supabaseAdmin.from('profiles').delete().eq('id', targetUserId)
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/admin/profile')
+    return { success: true }
+  } catch (err: any) {
+    return { error: 'Erro grave: ' + err.message }
+  }
 }

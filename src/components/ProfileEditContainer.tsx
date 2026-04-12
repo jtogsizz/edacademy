@@ -9,6 +9,8 @@ interface InitialProfile {
   whatsapp_number: string | null
   instagram_handle: string | null
   avatar_url: string | null
+  timezone?: string | null
+  language?: string | null
 }
 
 interface Props {
@@ -18,14 +20,18 @@ interface Props {
   saveAction: (
     fullName: string,
     whatsapp: string,
-    instagram?: string
+    instagram?: string,
+    timezone?: string,
+    language?: string
   ) => Promise<{ success?: boolean; error?: string }>
+  userRole?: string
 }
 
 export default function ProfileEditContainer({
   userId,
   initialProfile,
   isReadOnly = false,
+  userRole,
   saveAction,
 }: Props) {
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
@@ -56,8 +62,11 @@ export default function ProfileEditContainer({
           initialFullName={initialProfile.full_name || ''}
           initialWhatsapp={initialProfile.whatsapp_number || ''}
           initialInstagram={initialProfile.instagram_handle || ''}
+          initialTimezone={initialProfile.timezone || ''}
+          initialLanguage={initialProfile.language || ''}
           isReadOnly={isReadOnly}
           isAvatarUploading={isAvatarUploading}
+          userRole={userRole}
           saveAction={saveAction}
         />
       </div>

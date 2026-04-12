@@ -51,7 +51,7 @@ export default function SubscriptionManualManager({
         className="btn-outline" 
         style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', marginLeft: '0.5rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
       >
-        ⚙️ Ajuste Manual
+        Ajuste Manual
       </button>
     )
   }

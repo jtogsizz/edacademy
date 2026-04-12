@@ -3,19 +3,22 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import { format } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
 import RecurringClassForm from './RecurringClassForm'
 import { getUnifiedStudentAgenda } from '@/utils/agendaUtils'
 import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
-
-
+import { cookies } from 'next/headers'
 
 export default async function StudentProfilePage() {
   // Garante que essa página sempre busca dados frescos do banco, nunca do cache
   noStore()
   const supabase = await createClient()
+
+  const cookieStore = await cookies()
+  const clientTz = cookieStore.get('client_tz')?.value
 
   const {
     data: { user },
@@ -32,6 +35,9 @@ export default async function StudentProfilePage() {
   if (profile?.role === 'admin' || profile?.role === 'admin_master') {
     redirect('/admin')
   }
+
+  const userTz = profile?.timezone || clientTz || 'America/Sao_Paulo'
+  const isFallback = !profile?.timezone && !clientTz
 
   const { data: subscription } = await supabase
     .from('subscriptions')
@@ -112,9 +118,11 @@ export default async function StudentProfilePage() {
               full_name: profile?.full_name || '',
               whatsapp_number: profile?.whatsapp_number || '',
               instagram_handle: profile?.instagram_handle || '',
-              avatar_url: profile?.avatar_url || null
+              avatar_url: profile?.avatar_url || null,
+              timezone: profile?.timezone || null
             }}
-            isReadOnly={true}
+            isReadOnly={false}
+            userRole={profile?.role}
             saveAction={updateProfile}
           />
         </section>
@@ -161,6 +169,17 @@ export default async function StudentProfilePage() {
             ) : null}
           </div>
 
+          {/* Fuso Horário */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '0.75rem' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Fuso Horário</div>
+              <div style={{ fontWeight: 600 }}>
+                {profile?.timezone ? profile.timezone : (clientTz ? `${clientTz} (sincronizado)` : 'Não detectado')}
+              </div>
+            </div>
+            <span style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>🕒</span>
+          </div>
+
           {/* Vencimento */}
           {subscription?.end_date && (
             <div style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
@@ -187,19 +206,29 @@ export default async function StudentProfilePage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(Min(100%, 350px), 1fr))', gap: '2rem' }}>
           {/* Dynamic Form */}
-          <RecurringClassForm teachers={teachers || []} />
+          <RecurringClassForm teachers={teachers || []} userTimezone={userTz} />
 
           {/* Current Recurring List */}
           <div>
             <h4 style={{ margin: 0, fontSize: '1rem', marginBottom: '1rem' }}>Minha Grade Semanal</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {recurring && recurring.length > 0 ? (
-                recurring.map(r => (
-                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{daysLabels[r.day_of_week]}, {r.start_time.slice(0,5)}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Prof. {r.teacher?.full_name}</div>
-                    </div>
+                recurring.map(r => {
+                  const [h, m] = r.start_time.split(':').map(Number)
+                  // Build a deterministic UTC Date for this recurring slot
+                  const utcBase = new Date(Date.UTC(2000, 0, -5 + r.day_of_week, h, m, 0))
+                  
+                  // Apply 10 mins rule
+                  const utcClassBase = new Date(utcBase.getTime() + 10 * 60 * 1000)
+                  
+                  return (
+                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--primary)', textTransform: 'capitalize' }}>
+                          {formatInTimeZone(utcClassBase, userTz, "EEEE, HH:mm", { locale: ptBR })}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Prof. {r.teacher?.full_name}</div>
+                      </div>
                     <form action={async () => {
                       'use server'
                       const { removeRecurringClass } = await import('@/app/dashboard/schedule/actions')
@@ -208,7 +237,7 @@ export default async function StudentProfilePage() {
                       <button type="submit" style={{ background: 'none', border: 'none', color: 'var(--error)', fontSize: '0.8rem', cursor: 'pointer', padding: '0.5rem' }}>Remover</button>
                     </form>
                   </div>
-                ))
+                )})
               ) : (
                 <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.9rem', border: '1px dashed var(--border)' }}>Você ainda não definiu seu horário fixo.</div>
               )}
@@ -230,19 +259,22 @@ export default async function StudentProfilePage() {
             const canEnter = now >= earlyEntry && now <= end
             const isOngoing = now >= start && now <= end
             const teacher = apt.teacher
+            const displayStart = new Date(start.getTime() + 10 * 60 * 1000)
 
             return (
               <div key={apt.id} className="card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', borderLeft: apt.is_recurring ? '4px solid var(--primary)' : '4px solid var(--success)' }}>
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                   <div style={{ textAlign: 'center', minWidth: '60px' }}>
-                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{format(start, 'MMM', { locale: ptBR })}</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{format(start, 'dd')}</div>
+                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{formatInTimeZone(start, userTz, 'MMM', { locale: ptBR })}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{formatInTimeZone(start, userTz, 'dd')}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
                       {apt.is_recurring ? 'AULA FIXA DO PLANO' : 'AULA DE REPOSIÇÃO / EXTRA'}
                     </div>
-                    <div style={{ fontWeight: 600 }}>{format(start, 'HH:mm')} - {format(end, 'HH:mm')}</div>
+                    <div style={{ fontWeight: 600 }}>
+                      <>{formatInTimeZone(displayStart, userTz, 'HH:mm')} - {formatInTimeZone(end, userTz, 'HH:mm')} <span style={{fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px'}}>{!isFallback ? '(seu fuso)' : '(padrão BR)'}</span></>
+                    </div>
                     <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Prof. {teacher?.full_name}</div>
                   </div>
                 </div>

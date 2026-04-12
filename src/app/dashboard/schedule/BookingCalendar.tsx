@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from 'react'
-import { format, parseISO } from 'date-fns'
+import { parseISO } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { bookSlot, rescheduleAppointment } from './actions'
@@ -9,10 +10,12 @@ import type { Slot } from './ScheduleEngine'
 
 export default function BookingCalendar({ 
   groupedDates, 
-  teacherId 
+  teacherId,
+  userTimezone
 }: { 
   groupedDates: Record<string, Slot[]>, 
-  teacherId: string 
+  teacherId: string,
+  userTimezone: string
 }) {
   const searchParams = useSearchParams()
   const rescheduleId = searchParams.get('reschedule_id')
@@ -92,10 +95,10 @@ export default function BookingCalendar({
               >
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '1.05rem', textTransform: 'capitalize' }}>
-                    {format(dateObj, "dd 'de' MMM", { locale: ptBR })}
+                    {formatInTimeZone(dateObj, userTimezone, "dd 'de' MMM", { locale: ptBR })}
                   </div>
                   <div style={{ fontSize: '0.8rem', opacity: isSelected ? 0.9 : 0.6, textTransform: 'capitalize' }}>
-                    {format(dateObj, "EEEE", { locale: ptBR })}
+                    {formatInTimeZone(dateObj, userTimezone, "EEEE", { locale: ptBR })}
                   </div>
                 </div>
                 {allOccupied && !emptyDay && (
@@ -116,7 +119,7 @@ export default function BookingCalendar({
           <>
             <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
               <h3 style={{ textTransform: 'capitalize' }}>
-                {format(parseISO(selectedDateStr), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                {formatInTimeZone(parseISO(selectedDateStr), userTimezone, "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </h3>
               {rescheduleId && (
                 <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#d97706', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', marginTop: '0.75rem', border: '1px solid rgba(245, 158, 11, 0.2)', fontSize: '0.85rem' }}>
@@ -129,8 +132,8 @@ export default function BookingCalendar({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
               {selectedSlots.map((slot, idx) => {
-                const prepStart = format(parseISO(slot.prepStartTimeISO), "HH:mm")
-                const classStart = format(parseISO(slot.classStartTimeISO), "HH:mm")
+                const prepStart = formatInTimeZone(parseISO(slot.prepStartTimeISO), userTimezone, "HH:mm", { locale: ptBR })
+                const classStart = formatInTimeZone(parseISO(slot.classStartTimeISO), userTimezone, "HH:mm", { locale: ptBR })
 
                 if (slot.status === 'free') {
                   return (

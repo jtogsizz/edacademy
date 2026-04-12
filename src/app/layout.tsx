@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import FaqPopout from '@/components/FaqPopout'
 
 export const metadata: Metadata = {
   title: 'EdAcademy',
@@ -30,8 +31,31 @@ export default function RootLayout({
           </p>
         </footer>
 
-        {/* Link Fixo do Instagram - Canto Inferior Esquerdo */}
-        <div style={{ position: 'fixed', bottom: '80px', left: '16px', zIndex: 99 }}>
+        {/* Links Fixos Sociais - Canto Inferior Esquerdo */}
+        <div style={{ position: 'fixed', bottom: '80px', left: '16px', zIndex: 99, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          <a 
+            href="https://www.youtube.com/@nomadebilingue" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ 
+              fontSize: '0.8rem', 
+              color: 'var(--text-main)', 
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              padding: '0.4rem 0.8rem',
+              borderRadius: '20px',
+              border: '1px solid var(--border)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+              backdropFilter: 'blur(4px)'
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            YouTube
+          </a>
+
           <a 
             href="https://www.instagram.com/edacademyy/" 
             target="_blank" 
@@ -55,6 +79,9 @@ export default function RootLayout({
             Instagram Oficial
           </a>
         </div>
+
+        {/* Global FAQ Popout */}
+        <FaqPopout />
       </body>
     </html>
   )

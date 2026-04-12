@@ -15,8 +15,8 @@ interface ProfessorCarouselProps {
 
 const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
   const autoplayRef = useRef<NodeJS.Timeout | null>(null);
 
   const nextSlide = useCallback(() => {
@@ -43,34 +43,23 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
     autoplayRef.current = setInterval(nextSlide, 5000);
   };
 
-  const handlePrev = () => {
-    prevSlide();
+  // Unified Drag/Swipe Logic
+  const handleStart = (clientX: number) => {
+    setIsDragging(true);
+    setStartX(clientX);
+    if (autoplayRef.current) clearInterval(autoplayRef.current);
+  };
+
+  const handleEnd = (clientX: number) => {
+    if (!isDragging) return;
+    const diff = startX - clientX;
+    if (diff > 50) {
+      nextSlide();
+    } else if (diff < -50) {
+      prevSlide();
+    }
+    setIsDragging(false);
     resetAutoplay();
-  };
-
-  const handleNext = () => {
-    nextSlide();
-    resetAutoplay();
-  };
-
-  // Touch handlers for swipe
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe) handleNext();
-    if (isRightSwipe) handlePrev();
   };
 
   if (!professors || professors.length === 0) {
@@ -80,10 +69,12 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
   return (
     <div className="carousel-container">
       <div 
-        className="carousel-wrapper"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        className={`carousel-wrapper ${isDragging ? 'dragging' : ''}`}
+        onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+        onTouchEnd={(e) => handleEnd(e.changedTouches[0].clientX)}
+        onMouseDown={(e) => handleStart(e.clientX)}
+        onMouseUp={(e) => handleEnd(e.clientX)}
+        onMouseLeave={() => setIsDragging(false)}
       >
         {professors.map((prof, index) => {
           let position = 'next';
@@ -107,13 +98,15 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
                 <img
                   src={prof.image}
                   alt={prof.name}
+                  draggable="false"
                   style={{ 
                     position: 'absolute',
                     top: 0,
                     left: 0,
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover' 
+                    objectFit: 'cover',
+                    userSelect: 'none'
                   }}
                   loading={position === 'active' ? 'eager' : 'lazy'}
                 />
@@ -129,9 +122,6 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
       </div>
 
       <div className="carousel-controls">
-        <button className="control-btn" onClick={handlePrev} aria-label="Anterior">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
         <div className="carousel-dots">
           {professors.map((_, i) => (
             <span 
@@ -144,9 +134,6 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
             />
           ))}
         </div>
-        <button className="control-btn" onClick={handleNext} aria-label="Próximo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
       </div>
 
       <style jsx>{`
@@ -155,6 +142,7 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
           width: 100%;
           perspective: 1000px;
           padding: 1rem 0;
+          user-select: none;
         }
 
         .carousel-wrapper {
@@ -164,6 +152,11 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
           align-items: center;
           height: 420px;
           transform-style: preserve-3d;
+          cursor: grab;
+        }
+
+        .carousel-wrapper.dragging {
+          cursor: grabbing;
         }
 
         .carousel-card {
@@ -212,6 +205,7 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
           width: 100%;
           height: 70%;
           background: var(--border);
+          pointer-events: none;
         }
 
         .card-info {
@@ -243,30 +237,7 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 2rem;
           margin-top: 2rem;
-        }
-
-        .control-btn {
-          background: #fff;
-          border: 1px solid var(--border);
-          color: var(--text-main);
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.2s;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        }
-
-        .control-btn:hover {
-          background: var(--primary);
-          color: #fff;
-          border-color: var(--primary);
-          transform: translateY(-2px);
         }
 
         .carousel-dots {
@@ -298,16 +269,19 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
             height: 420px;
           }
           .carousel-card.prev {
-            transform: translateX(-80%) scale(0.75) rotateY(10deg);
-            opacity: 0; /* Hide side cards on mobile to focus on center */
+            transform: translateX(-50%) scale(0.75) rotateY(10deg);
+            opacity: 0.3;
+            z-index: 5;
           }
           .carousel-card.next {
-            transform: translateX(80%) scale(0.75) rotateY(-10deg);
-            opacity: 0;
+            transform: translateX(50%) scale(0.75) rotateY(-10deg);
+            opacity: 0.3;
+            z-index: 5;
           }
            .carousel-card.active {
             transform: translateX(0) scale(1);
             opacity: 1;
+            z-index: 10;
           }
         }
       `}</style>

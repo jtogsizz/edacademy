@@ -129,9 +129,9 @@ export async function rescheduleAppointment(appointmentId: string, newStartTimeI
       const [sh, sm] = rec.start_time.split(':').map(Number)
       const [eh, em] = rec.end_time.split(':').map(Number)
       const origStart = new Date(originalSlotISO)
-      origStart.setHours(sh, sm, 0, 0)
+      origStart.setUTCHours(sh, sm, 0, 0)
       const origEnd = new Date(originalSlotISO)
-      origEnd.setHours(eh, em, 0, 0)
+      origEnd.setUTCHours(eh, em, 0, 0)
 
       await supabase.from('appointments').insert({
         student_id: user.id,
@@ -216,9 +216,9 @@ export async function getTeacherAvailabilityTemplate(teacherId: string) {
 }
 
 /**
- * Adiciona uma aula fixa recorrente.
+ * Adiciona uma aula fixa recorrente usando o ISO UTC puro.
  */
-export async function addRecurringClass(dayOfWeek: number, startTime: string, teacherId: string) {
+export async function addRecurringClass(utcStartISO: string, teacherId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado' }
@@ -244,8 +244,16 @@ export async function addRecurringClass(dayOfWeek: number, startTime: string, te
     return { error: 'Limite de plano atingido: Máximo 1 horário fixo ativo.' }
   }
 
-  // 2. Validar conflito
+  // 1.5 Extrair dados em UTC
+  const startDate = new Date(utcStartISO)
+  const dayOfWeek = startDate.getUTCDay()
+  
+  const sh = startDate.getUTCHours().toString().padStart(2, '0')
+  const sm = startDate.getUTCMinutes().toString().padStart(2, '0')
+  const startTime = `${sh}:${sm}`
   const startTimeSec = `${startTime}:00`
+
+  // 2. Validar conflito
   const { data: conflict } = await supabase
     .from('recurring_classes')
     .select('id')
@@ -279,9 +287,10 @@ export async function addRecurringClass(dayOfWeek: number, startTime: string, te
     return { error: 'O professor não está disponível neste horário.' }
   }
 
-  const [h, m] = startTime.split(':').map(Number)
-  const endHour = (h + 1).toString().padStart(2, '0')
-  const endTime = `${endHour}:${m.toString().padStart(2, '0')}:00`
+  const endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
+  const eh = endDate.getUTCHours().toString().padStart(2, '0')
+  const em = endDate.getUTCMinutes().toString().padStart(2, '0')
+  const endTime = `${eh}:${em}:00`
 
   const { error } = await supabase.from('recurring_classes').insert({
     student_id: user.id,
@@ -342,9 +351,9 @@ export async function cancelRecurringClassInstance(syntheticId: string, reason: 
   const [sh, sm] = rec.start_time.split(':').map(Number)
   const [eh, em] = rec.end_time.split(':').map(Number)
   const slotStart = new Date(slotDateISO)
-  slotStart.setHours(sh, sm, 0, 0)
+  slotStart.setUTCHours(sh, sm, 0, 0)
   const slotEnd = new Date(slotDateISO)
-  slotEnd.setHours(eh, em, 0, 0)
+  slotEnd.setUTCHours(eh, em, 0, 0)
 
   // Verificar se já existe uma exceção para esse slot (evitar duplicata)
   const { data: existing } = await supabase
@@ -466,9 +475,9 @@ export async function cancelDayByTeacher(dateISO: string, reason: string) {
       if (processedStudents.has(rec.student_id)) continue
 
       const [sh, sm] = rec.start_time.split(':').map(Number)
-      const istart = new Date(targetDate); istart.setHours(sh, sm, 0, 0)
+      const istart = new Date(targetDate); istart.setUTCHours(sh, sm, 0, 0)
       const [eh, em] = rec.end_time.split(':').map(Number)
-      const iend = new Date(targetDate); iend.setHours(eh, em, 0, 0)
+      const iend = new Date(targetDate); iend.setUTCHours(eh, em, 0, 0)
 
       await supabase.from('appointments').insert({
         student_id: rec.student_id,

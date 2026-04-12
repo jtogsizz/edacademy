@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
+import { utcToLocalTime } from '@/utils/agendaUtils'
 import { AvailabilityForm } from './AdminConfigForms'
 
 const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
@@ -10,7 +12,10 @@ export default async function AdminSchedulePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const cookieStore = await cookies()
+  const clientTz = cookieStore.get('client_tz')?.value
+
+  const { data: profile } = await supabase.from('profiles').select('role, timezone').eq('id', user.id).single()
   if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
 
   // 1. Fetch Availability (Expediente Base)
@@ -28,6 +33,38 @@ export default async function AdminSchedulePage() {
     .eq('teacher_id', user.id)
     .order('day_of_week')
     .order('start_time')
+
+  const userTz = profile?.timezone || clientTz || 'America/Sao_Paulo'
+  
+  // Transform Availability para a Timezone do Professor
+  const localAvail = (availability || []).map(av => {
+    const startObj = utcToLocalTime(av.day_of_week, av.start_time, userTz)
+    const endObj = utcToLocalTime(av.day_of_week, av.end_time, userTz)
+    return {
+      ...av,
+      localDay: startObj.localDay,
+      localStart: startObj.localTime,
+      localEnd: endObj.localTime
+    }
+  }).sort((a,b) => {
+    if (a.localDay !== b.localDay) return a.localDay - b.localDay
+    return a.localStart.localeCompare(b.localStart)
+  })
+
+  // Transform Recurring para a Timezone do Professor
+  const localRecurring = (recurring || []).map(req => {
+    const startObj = utcToLocalTime(req.day_of_week, req.start_time, userTz)
+    const endObj = utcToLocalTime(req.day_of_week, req.end_time, userTz)
+    return {
+      ...req,
+      localDay: startObj.localDay,
+      localStart: startObj.localTime,
+      localEnd: endObj.localTime
+    }
+  }).sort((a,b) => {
+    if (a.localDay !== b.localDay) return a.localDay - b.localDay
+    return a.localStart.localeCompare(b.localStart)
+  })
 
   return (
     <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '1000px' }}>
@@ -64,15 +101,15 @@ export default async function AdminSchedulePage() {
                 </tr>
               </thead>
               <tbody>
-                {availability?.map((av, index) => {
-                  const isSameDayAsPrevious = index > 0 && availability[index-1].day_of_week === av.day_of_week;
+                {localAvail?.map((av, index) => {
+                  const isSameDayAsPrevious = index > 0 && localAvail[index-1].localDay === av.localDay;
                   return (
                     <tr key={av.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '1rem', fontWeight: isSameDayAsPrevious ? 400 : 600 }}>
-                        {isSameDayAsPrevious ? <span style={{ color: 'var(--text-muted)', paddingLeft: '1rem' }}>↳ bloco extra</span> : diasSemana[av.day_of_week]}
+                        {isSameDayAsPrevious ? <span style={{ color: 'var(--text-muted)', paddingLeft: '1rem' }}>↳ bloco extra</span> : diasSemana[av.localDay]}
                       </td>
-                      <td style={{ padding: '1rem' }}>{av.start_time.substring(0, 5)}</td>
-                      <td style={{ padding: '1rem' }}>{av.end_time.substring(0, 5)}</td>
+                      <td style={{ padding: '1rem' }}>{av.localStart}</td>
+                      <td style={{ padding: '1rem' }}>{av.localEnd}</td>
                       <td style={{ padding: '1rem', textAlign: 'right' }}>
                         <form action={async () => {
                           'use server'
@@ -85,7 +122,7 @@ export default async function AdminSchedulePage() {
                     </tr>
                   )
                 })}
-                {(!availability || availability.length === 0) && (
+                {(!localAvail || localAvail.length === 0) && (
                   <tr><td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum horário de expediente cadastrado.</td></tr>
                 )}
               </tbody>
@@ -112,17 +149,17 @@ export default async function AdminSchedulePage() {
                 </tr>
               </thead>
               <tbody>
-                {recurring?.map(req => {
+                {localRecurring?.map(req => {
                   const studentProf = req.student as any
                   return (
                     <tr key={req.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '1rem', fontWeight: 600 }}>{studentProf?.full_name}</td>
-                      <td style={{ padding: '1rem' }}>{diasSemana[req.day_of_week]}</td>
-                      <td style={{ padding: '1rem' }}>{req.start_time.substring(0, 5)} - {req.end_time.substring(0, 5)}</td>
+                      <td style={{ padding: '1rem' }}>{diasSemana[req.localDay]}</td>
+                      <td style={{ padding: '1rem' }}>{req.localStart} - {req.localEnd}</td>
                     </tr>
                   )
                 })}
-                {(!recurring || recurring.length === 0) && (
+                {(!localRecurring || localRecurring.length === 0) && (
                   <tr><td colSpan={3} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma aula fixa vinculada no momento.</td></tr>
                 )}
               </tbody>

@@ -1,4 +1,5 @@
-import { addDays, addMinutes, format, getDay, isBefore, startOfMonth, startOfDay } from 'date-fns'
+import { addDays, addMinutes, isBefore } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 
 export interface Slot {
   startTimeISO: string
@@ -12,25 +13,25 @@ export function generateScheduleGrid(
   availability: any[],
   recurring: any[],
   appointments: any[],
-  myUserId: string
+  myUserId: string,
+  userTimezone: string
 ) {
-  const today = startOfDay(new Date())
+  const nowUTC = new Date()
+  const todayUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate()))
   // Gerar até 45 dias no futuro
-  const endInterval = addDays(today, 45)
-  const days = []
+  const endIntervalUTC = new Date(todayUTC.getTime() + 45 * 24 * 3600 * 1000)
   
-  let curr = today
-  while (isBefore(curr, endInterval) || curr.getTime() === endInterval.getTime()) {
-    days.push(curr)
-    curr = addDays(curr, 1)
+  const daysUTC = []
+  let curr = todayUTC
+  while (curr.getTime() <= endIntervalUTC.getTime()) {
+    daysUTC.push(new Date(curr.getTime()))
+    curr = new Date(curr.getTime() + 24 * 3600 * 1000)
   }
 
   const groupedDates: Record<string, Slot[]> = {}
 
-  for (const date of days) {
-    const dayOfWeek = getDay(date)
-    const dStr = format(date, 'yyyy-MM-dd')
-    groupedDates[dStr] = []
+  for (const dateUTC of daysUTC) {
+    const dayOfWeek = dateUTC.getUTCDay()
 
     const avails = availability.filter(a => a.day_of_week === dayOfWeek)
     
@@ -40,11 +41,8 @@ export function generateScheduleGrid(
       const [sh, sm] = av.start_time.split(':').map(Number)
       const [eh, em] = av.end_time.split(':').map(Number)
       
-      let slotStartTime = new Date(date)
-      slotStartTime.setHours(sh, sm, 0, 0)
-      
-      const dayEndTime = new Date(date)
-      dayEndTime.setHours(eh, em, 0, 0)
+      let slotStartTime = new Date(Date.UTC(dateUTC.getUTCFullYear(), dateUTC.getUTCMonth(), dateUTC.getUTCDate(), sh, sm, 0, 0))
+      const dayEndTime = new Date(Date.UTC(dateUTC.getUTCFullYear(), dateUTC.getUTCMonth(), dateUTC.getUTCDate(), eh, em, 0, 0))
 
       while (isBefore(slotStartTime, dayEndTime)) {
         const slotEndTime = addMinutes(slotStartTime, av.slot_duration || 60)
@@ -58,7 +56,10 @@ export function generateScheduleGrid(
         // Camada 2: Recurring Classes (Aulas Fixas Mensais)
         // Check if there is any recurring class that starts EXACTLY at this time for this day of week
         // We only check start_time purely
-        const slotTimeStr = format(slotStartTime, 'HH:mm:ss')
+        const slotHour = slotStartTime.getUTCHours().toString().padStart(2, '0')
+        const slotMin = slotStartTime.getUTCMinutes().toString().padStart(2, '0')
+        const slotSec = slotStartTime.getUTCSeconds().toString().padStart(2, '0')
+        const slotTimeStr = `${slotHour}:${slotMin}:${slotSec}`
         const recurringClass = recurring.find(r => r.day_of_week === dayOfWeek && r.start_time === slotTimeStr)
 
         let status: 'free' | 'occupied' | 'my_class' = 'free'
@@ -82,7 +83,13 @@ export function generateScheduleGrid(
 
         const classStartTime = addMinutes(slotStartTime, 10)
 
-        groupedDates[dStr].push({
+        // Agora transformamos o horário absoluto em timezone-string para o calendário Group do usuário
+        const dStrContext = formatInTimeZone(slotStartTime, userTimezone, 'yyyy-MM-dd')
+        if (!groupedDates[dStrContext]) {
+          groupedDates[dStrContext] = []
+        }
+
+        groupedDates[dStrContext].push({
           startTimeISO: slotStartTime.toISOString(),
           endTimeISO: slotEndTime.toISOString(),
           prepStartTimeISO: slotStartTime.toISOString(),
@@ -93,8 +100,10 @@ export function generateScheduleGrid(
         slotStartTime = slotEndTime
       }
     }
+  }
 
-    // Sort by time
+  // Ordena globalmente os slots de cada dia localizado mapeado
+  for (const dStr of Object.keys(groupedDates)) {
     groupedDates[dStr].sort((a,b) => new Date(a.startTimeISO).getTime() - new Date(b.startTimeISO).getTime())
   }
 
@@ -112,6 +121,14 @@ export function getTeacherWeeklyTemplate(
 ) {
   const weekTemplate: Record<number, any[]> = {}
   
+  // Utilizar a semana ATUAL no fuso UTC para não sofrer deslocamento de Historic DST (Horário de Verão ano 2000)
+  const now = new Date()
+  const currentUTCWeekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  // Ajustar para domingo absoluto em UTC
+  while (currentUTCWeekStart.getUTCDay() !== 0) {
+    currentUTCWeekStart.setUTCDate(currentUTCWeekStart.getUTCDate() - 1)
+  }
+
   // Para cada dia da semana (0-6)
   for (let day = 0; day <= 6; day++) {
     weekTemplate[day] = []
@@ -121,12 +138,15 @@ export function getTeacherWeeklyTemplate(
       const [sh, sm] = av.start_time.split(':').map(Number)
       const [eh, em] = av.end_time.split(':').map(Number)
       
-      let start = new Date(2000, 0, 1, sh, sm, 0)
-      const end = new Date(2000, 0, 1, eh, em, 0)
+      let start = new Date(Date.UTC(currentUTCWeekStart.getUTCFullYear(), currentUTCWeekStart.getUTCMonth(), currentUTCWeekStart.getUTCDate() + day, sh, sm, 0))
+      const end = new Date(Date.UTC(currentUTCWeekStart.getUTCFullYear(), currentUTCWeekStart.getUTCMonth(), currentUTCWeekStart.getUTCDate() + day, eh, em, 0))
       
       while (isBefore(start, end)) {
         const slotEnd = addMinutes(start, 60)
-        const timeStr = format(start, 'HH:mm:ss')
+        const shString = start.getUTCHours().toString().padStart(2, '0')
+        const smString = start.getUTCMinutes().toString().padStart(2, '0')
+        const ssString = start.getUTCSeconds().toString().padStart(2, '0')
+        const timeStr = `${shString}:${smString}:${ssString}`
         
         // Verifica se já existe recorrência NESSE DIA/HORA
         const isOccupied = recurring.some(r => 
@@ -136,9 +156,13 @@ export function getTeacherWeeklyTemplate(
         )
         
         if (!isOccupied) {
+          const classStart = addMinutes(start, 10);
           weekTemplate[day].push({
-            start: timeStr.substring(0, 5),
-            label: `${timeStr.substring(0, 5)} - ${format(slotEnd, 'HH:mm')}`
+            dayOfWeek: day, // explicitly include UTC day
+            start: timeStr.substring(0, 5), // raw UTC string
+            utcStartISO: start.toISOString(),
+            utcClassStartISO: classStart.toISOString(),
+            utcEndISO: slotEnd.toISOString()
           })
         }
         

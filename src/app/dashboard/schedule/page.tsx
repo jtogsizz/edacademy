@@ -19,11 +19,12 @@ export default async function SchedulePage({
   // Buscar idioma do aluno (necessário para filtrar professores)
   const { data: studentProfile } = await supabase
     .from('profiles')
-    .select('student_language')
+    .select('student_language, timezone')
     .eq('id', user.id)
     .single()
 
   const studentLanguage = studentProfile?.student_language ?? null
+  const userTimezone = studentProfile?.timezone || 'America/Sao_Paulo'
 
   // Resolvemos searchParams assíncronos (Next 15)
   const resolvedParams = await searchParams
@@ -103,7 +104,8 @@ export default async function SchedulePage({
     availability || [],
     recurring || [],
     appointments || [],
-    user.id
+    user.id,
+    userTimezone
   )
 
   return (
@@ -116,7 +118,7 @@ export default async function SchedulePage({
         <p style={{ color: 'var(--text-muted)' }}>Escolha um dia livre para suas aulas.</p>
       </header>
 
-      <BookingCalendar groupedDates={groupedDates} teacherId={teacherId} />
+      <BookingCalendar groupedDates={groupedDates} teacherId={teacherId} userTimezone={userTimezone} />
     </div>
   )
 }

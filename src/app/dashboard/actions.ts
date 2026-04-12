@@ -57,28 +57,35 @@ export async function updateProfileAvatar(avatarUrl: string) {
 }
 
 /**
- * Atualiza informações de contato do próprio usuário (nome, whatsapp, instagram).
- * Funciona para Alunos e Admins.
+ * Atualiza informações de contato do próprio usuário.
+ * Alunos: Apenas full_name, whatsapp_number e timezone.
+ * Admins: IDK, podem editar instagram também.
  */
-export async function updateProfile(fullName: string, whatsapp: string, instagram?: string) {
+export async function updateProfile(fullName: string, whatsapp: string, instagram?: string, timezone?: string, language?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado' }
 
-  // 1. Verificar regra de negócio: Alunos apenas visualizam
+  // 1. Identifica a role do usuário
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role === 'student') {
-    return { error: 'Apenas administradores podem editar dados cadastrais (Nome/WhatsApp).' }
+  
+  // payload seguro limitado àquelas 3 chaves para estudantes
+  const updatePayload: any = {
+    full_name: fullName,
+    whatsapp_number: whatsapp || null,
+    timezone: timezone || null,
+    updated_at: new Date().toISOString()
+  }
+
+  // Apenas admins podem ter o instagram e idioma guardado no updateProfile
+  if (profile?.role === 'admin' || profile?.role === 'admin_master') {
+    updatePayload.instagram_handle = instagram || null
+    updatePayload.language = language || null
   }
 
   const { error } = await supabase
     .from('profiles')
-    .update({
-      full_name: fullName,
-      whatsapp_number: whatsapp || null,
-      instagram_handle: instagram || null,
-      updated_at: new Date().toISOString()
-    })
+    .update(updatePayload)
     .eq('id', user.id)
 
   if (error) return { error: error.message }

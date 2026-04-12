@@ -3,13 +3,17 @@ import { redirect } from 'next/navigation'
 import LogoutButton from '@/components/LogoutButton'
 import SubscriptionManualManager from '@/components/SubscriptionManualManager'
 import ToggleSubscriptionButton from '@/components/ToggleSubscriptionButton'
+import DeleteUserButton from '@/components/DeleteUserButton'
 import Link from 'next/link'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
 import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
+import { changeUserRole, setTeacherLanguage, setStudentLanguage } from '@/app/admin/actions'
 
-export default async function AdminProfilePage() {
+export default async function AdminProfilePage(props: { searchParams?: Promise<any> | any }) {
   noStore()
+  // Trata Next14/15 de forma estável (await on non-promise is valid, await on promise resolves it)
+  const sp = props.searchParams ? await props.searchParams : {}
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -17,7 +21,7 @@ export default async function AdminProfilePage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
 
-  const { data: students } = await supabase
+  let { data: students } = await supabase
     .from('profiles')
     .select(`
       *,
@@ -26,12 +30,48 @@ export default async function AdminProfilePage() {
     .eq('role', 'student')
     .order('created_at', { ascending: false })
 
+  let filteredStudents = students || []
+
+  // 1. Filtro Texto (Nome ou E-mail)
+  if (sp.q) {
+    const qTerm = String(sp.q).toLowerCase()
+    filteredStudents = filteredStudents.filter(s => 
+      s.full_name?.toLowerCase().includes(qTerm) || 
+      s.email?.toLowerCase().includes(qTerm)
+    )
+  }
+
+  // 2. Filtro Idioma
+  if (sp.lang) {
+    filteredStudents = filteredStudents.filter(s => s.student_language === sp.lang)
+  }
+
+  // 3. Ordenação de Vencimento
+  if (sp.sort === 'asc') {
+    filteredStudents.sort((a,b) => {
+       const subA = Array.isArray(a.subscriptions) ? a.subscriptions[0] : a.subscriptions;
+       const subB = Array.isArray(b.subscriptions) ? b.subscriptions[0] : b.subscriptions;
+       const tA = subA?.end_date ? new Date(subA.end_date).getTime() : 4102444800000;
+       const tB = subB?.end_date ? new Date(subB.end_date).getTime() : 4102444800000;
+       return tA - tB;
+    })
+  } else if (sp.sort === 'desc') {
+    filteredStudents.sort((a,b) => {
+       const subA = Array.isArray(a.subscriptions) ? a.subscriptions[0] : a.subscriptions;
+       const subB = Array.isArray(b.subscriptions) ? b.subscriptions[0] : b.subscriptions;
+       const tA = subA?.end_date ? new Date(subA.end_date).getTime() : 0;
+       const tB = subB?.end_date ? new Date(subB.end_date).getTime() : 0;
+       return tB - tA;
+    })
+  }
+
   let admins: any[] = []
   if (profile?.role === 'admin_master') {
     const { data: adminsData } = await supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'admin')
+      .in('role', ['admin', 'admin_master'])
+      .neq('id', user.id)
       .order('created_at', { ascending: false })
     admins = adminsData || []
   }
@@ -59,9 +99,12 @@ export default async function AdminProfilePage() {
               full_name: profile?.full_name || '',
               whatsapp_number: profile?.whatsapp_number || '',
               instagram_handle: profile?.instagram_handle || '',
-              avatar_url: profile?.avatar_url || null
+              avatar_url: profile?.avatar_url || null,
+              timezone: profile?.timezone || null,
+              language: profile?.language || null
             }}
             isReadOnly={false}
+            userRole={profile?.role}
             saveAction={updateProfile}
           />
 
@@ -94,10 +137,17 @@ export default async function AdminProfilePage() {
                   <tr key={admin.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', overflow: 'hidden' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', overflow: 'hidden', flexShrink: 0 }}>
                           <img src={admin.avatar_url || "/default-avatar.svg"} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
-                        <span style={{ fontWeight: 500 }}>{admin.full_name}</span>
+                        <span style={{ fontWeight: 500 }}>
+                          {admin.full_name}
+                          {admin.role === 'admin_master' && (
+                            <span style={{ marginLeft: '8px', fontSize: '0.65rem', padding: '0.15rem 0.4rem', backgroundColor: 'var(--primary)', color: '#fff', borderRadius: '4px', verticalAlign: 'middle' }}>
+                              Master
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </td>
                     <td style={{ padding: '1rem' }}>
@@ -112,12 +162,6 @@ export default async function AdminProfilePage() {
                           <option value="">-- Nenhum --</option>
                           <option value="english">Inglês</option>
                           <option value="spanish">Espanhol</option>
-                          <option value="french">Francês</option>
-                          <option value="portuguese">Português</option>
-                          <option value="german">Alemão</option>
-                          <option value="italian">Italiano</option>
-                          <option value="mandarin">Mandarim</option>
-                          <option value="japanese">Japonês</option>
                         </select>
                         <button type="submit" className="btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}>Salvar</button>
                       </form>
@@ -125,7 +169,6 @@ export default async function AdminProfilePage() {
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <form action={async () => {
                         'use server'
-                        const { changeUserRole } = await import('@/app/admin/actions')
                         await changeUserRole(admin.id, 'student')
                       }}>
                         <button type="submit" className="btn-outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', color: 'var(--error)', borderColor: 'var(--error)' }}>
@@ -146,25 +189,66 @@ export default async function AdminProfilePage() {
         </section>
       )}
 
-      <section className="card" style={{ padding: '0', overflow: 'hidden' }}>
+      <section className="card" style={{ padding: '0', overflow: 'hidden', marginTop: '2rem' }}>
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-main)' }}>
-          <h3>Gestão de Alunos</h3>
+          <h3 style={{ margin: 0 }}>Gestão de Alunos</h3>
+          <form id="filtersForm" method="get" style={{ display: 'none' }}></form>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', backgroundColor: 'var(--bg-main)' }}>
-                <th style={{ padding: '1rem' }}>Nome</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem', textAlign: 'center' }}>Vencimento</th>
-                <th style={{ padding: '1rem' }}>Idioma</th>
-                {profile?.role === 'admin_master' && <th style={{ padding: '1rem', textAlign: 'center' }}>Cargo</th>}
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Ação (Acesso)</th>
+                <th style={{ padding: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 600 }}>Nome</span>
+                    <input form="filtersForm" type="text" name="q" placeholder="Pesquisar..." defaultValue={sp.q || ''} style={{ width: '100%', maxWidth: '180px', padding: '0.3rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', fontSize: '0.75rem', fontWeight: 400 }} />
+                  </div>
+                </th>
+                <th style={{ padding: '1rem', verticalAlign: 'top' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 600 }}>Status</span>
+                  </div>
+                </th>
+                <th style={{ padding: '1rem', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600 }}>Vencimento</span>
+                    <select form="filtersForm" name="sort" defaultValue={sp.sort || ''} style={{ width: '100%', maxWidth: '140px', padding: '0.3rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', fontSize: '0.75rem', fontWeight: 400 }}>
+                      <option value="">Padrão</option>
+                      <option value="asc">A Vencer Primeiro</option>
+                      <option value="desc">Mais Distantes</option>
+                    </select>
+                  </div>
+                </th>
+                <th style={{ padding: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 600 }}>Idioma</span>
+                    <select form="filtersForm" name="lang" defaultValue={sp.lang || ''} style={{ width: '100%', maxWidth: '120px', padding: '0.3rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', fontSize: '0.75rem', fontWeight: 400 }}>
+                      <option value="">Todos</option>
+                      <option value="english">Inglês</option>
+                      <option value="spanish">Espanhol</option>
+                    </select>
+                  </div>
+                </th>
+                {profile?.role === 'admin_master' && (
+                  <th style={{ padding: '1rem', verticalAlign: 'top', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600 }}>Cargo</span>
+                    </div>
+                  </th>
+                )}
+                <th style={{ padding: '1rem', textAlign: 'right', verticalAlign: 'bottom' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', paddingBottom: '0.1rem' }}>
+                    <button form="filtersForm" type="submit" className="btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}>Filtrar</button>
+                    {(sp.q || sp.lang || sp.sort) && (
+                       <Link href="/admin/profile" className="btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}>Limpar</Link>
+                    )}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {students?.map(student => {
+              {filteredStudents.map((student: any) => {
                 const subArray = Array.isArray(student.subscriptions) ? student.subscriptions : [student.subscriptions]
                 const sub = subArray[0]
                 const isActive = sub?.status === 'active'
@@ -190,7 +274,12 @@ export default async function AdminProfilePage() {
                   <tr key={student.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontWeight: 500 }}>{student.full_name}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          <span style={{ fontWeight: 500 }}>{student.full_name}</span>
+                          {student.email && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{student.email}</span>
+                          )}
+                        </div>
                         {student.whatsapp_number && (
                            <a 
                              href={`https://wa.me/${student.whatsapp_number.replace(/\D/g, '')}`} 
@@ -228,27 +317,22 @@ export default async function AdminProfilePage() {
                           <option value="">--</option>
                           <option value="english">Inglês</option>
                           <option value="spanish">Espanhol</option>
-                          <option value="french">Francês</option>
-                          <option value="portuguese">Português</option>
-                          <option value="german">Alemão</option>
-                          <option value="italian">Italiano</option>
-                          <option value="mandarin">Mandarim</option>
-                          <option value="japanese">Japonês</option>
                         </select>
                         <button type="submit" className="btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}>✓</button>
                       </form>
                     </td>
                     {profile?.role === 'admin_master' && (
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <form action={async () => {
-                          'use server'
-                          const { changeUserRole } = await import('@/app/admin/actions')
-                          await changeUserRole(student.id, 'admin')
-                        }}>
-                          <button type="submit" className="btn-outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-                            Tornar Prof/Admin
-                          </button>
-                        </form>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <form action={async () => {
+                            'use server'
+                            await changeUserRole(student.id, 'admin')
+                          }}>
+                            <button type="submit" className="btn-outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} title="Tornar um Administrador comum/Professor">
+                              Tornar Prof
+                            </button>
+                          </form>
+                        </div>
                       </td>
                     )}
                     <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
@@ -259,13 +343,16 @@ export default async function AdminProfilePage() {
                       />
 
                       {profile?.role === 'admin_master' && (
-                        <SubscriptionManualManager 
-                          studentId={student.id}
-                          studentName={student.full_name}
-                          currentStatus={sub?.status || 'inactive'}
-                          currentEndDate={sub?.end_date || null}
-                          currentNotes={sub?.notes || null}
-                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <SubscriptionManualManager 
+                            studentId={student.id}
+                            studentName={student.full_name}
+                            currentStatus={sub?.status || 'inactive'}
+                            currentEndDate={sub?.end_date || null}
+                            currentNotes={sub?.notes || null}
+                          />
+                          <DeleteUserButton userId={student.id} userName={student.full_name} />
+                        </div>
                       )}
                     </td>
                   </tr>
