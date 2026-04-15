@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Feed from '@/components/Feed'
 import LogoutButton from '@/components/LogoutButton'
+import NotificationBell from '@/components/NotificationBell'
 
 export default async function DashboardFeedPage() {
   const supabase = await createClient()
@@ -22,7 +23,10 @@ export default async function DashboardFeedPage() {
           <h2>Feed</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Acompanhe as novidades e avisos.</p>
         </div>
-        <LogoutButton />
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <NotificationBell href="/dashboard/notifications" />
+          <LogoutButton />
+        </div>
       </header>
 
       <Feed isAdmin={false} />

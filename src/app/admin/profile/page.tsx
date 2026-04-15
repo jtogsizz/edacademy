@@ -6,9 +6,10 @@ import ToggleSubscriptionButton from '@/components/ToggleSubscriptionButton'
 import DeleteUserButton from '@/components/DeleteUserButton'
 import Link from 'next/link'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
+import PixConfigSection from './PixConfigSection'
 import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
-import { changeUserRole, setTeacherLanguage, setStudentLanguage } from '@/app/admin/actions'
+import { changeUserRole, setTeacherLanguage, setStudentLanguage, updatePixConfig } from '@/app/admin/actions'
 
 export default async function AdminProfilePage(props: { searchParams?: Promise<any> | any }) {
   noStore()
@@ -75,6 +76,12 @@ export default async function AdminProfilePage(props: { searchParams?: Promise<a
       .order('created_at', { ascending: false })
     admins = adminsData || []
   }
+
+  // Buscar config PIX
+  const { data: settings } = await supabase
+    .from('settings')
+    .select('pix_key, pix_key_type, pix_beneficiary_name, pix_qr_code_url')
+    .maybeSingle()
 
   return (
     <div className="container" style={{ padding: '2rem 1.5rem', paddingBottom: '6rem' }}>
@@ -187,6 +194,19 @@ export default async function AdminProfilePage(props: { searchParams?: Promise<a
             </table>
           </div>
         </section>
+      )}
+
+      {/* PIX Config — apenas admin_master */}
+      {profile?.role === 'admin_master' && (
+        <PixConfigSection
+          initial={{
+            pix_key: settings?.pix_key || null,
+            pix_key_type: settings?.pix_key_type || null,
+            pix_beneficiary_name: settings?.pix_beneficiary_name || null,
+            pix_qr_code_url: settings?.pix_qr_code_url || null,
+          }}
+          saveAction={updatePixConfig}
+        />
       )}
 
       <section className="card" style={{ padding: '0', overflow: 'hidden', marginTop: '2rem' }}>

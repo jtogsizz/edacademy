@@ -5,7 +5,7 @@ import { MessageCircle } from 'lucide-react'
 // =============== CONFIGURAÇÃO DE SUPORTE ===============
 // Para trocar o número de WhatsApp temporariamente ou permanentemente, altere o valor abaixo.
 // Formato: DDI + DDD + NÚMERO (sem espaços ou símbolos). Ex: 5511999999999
-const WHATSAPP_NUMBER = '554797710603'
+const WHATSAPP_NUMBER = '5547997710603'
 const WHATSAPP_MESSAGE = encodeURIComponent('Olá Melissa! Gostaria de uma ajuda com o acesso à EdAcademy.')
 const SUPPORT_NAME = 'Melissa'
 // ========================================================

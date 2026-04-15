@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { createNotification } from '@/lib/notifications'
 
 /**
  * Agenda uma aula extra consumindo 1 crédito de reposição.
@@ -82,7 +83,7 @@ export async function rescheduleAppointment(appointmentId: string, newStartTimeI
   if (!user) return { error: 'Não autorizado' }
 
   // 0. Validar assinatura ativa
-  const { data: subscription } = await supabase.from('subscriptions').select('status').eq('student_id', user.id).single()
+  const { data: subscription } = await supabase.from('subscriptions').select('status').eq('student_id', user.id).maybeSingle()
   if (subscription?.status !== 'active') return { error: 'Sua conta está inativa. Renove para reagendar aulas.' }
 
   const { data: sub } = await supabase.from('subscriptions').select('end_date').eq('student_id', user.id).maybeSingle()
@@ -93,6 +94,11 @@ export async function rescheduleAppointment(appointmentId: string, newStartTimeI
     if (newDate > expiry) {
       return { error: 'A aula de reposição deve ser marcada antes do vencimento do seu plano.' }
     }
+  }
+
+  // Garantia extra: nunca permitir reagendar para data já passada
+  if (new Date(newStartTimeISO) < new Date()) {
+    return { error: 'Não é possível remarcar para uma data no passado.' }
   }
 
   // Aula fixa recorrente: ID sintético no formato rec-{recurringId}-{isoDate}
@@ -333,7 +339,6 @@ export async function cancelRecurringClassInstance(syntheticId: string, reason: 
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const isAnyAdmin = profile?.role === 'admin' || profile?.role === 'admin_master'
-  if (!isAnyAdmin) return { error: 'Apenas professores podem cancelar aulas.' }
 
   // syntheticId: rec-{recurringId}-{isoDate}
   const parts = syntheticId.split('-')
@@ -347,6 +352,12 @@ export async function cancelRecurringClassInstance(syntheticId: string, reason: 
     .maybeSingle()
 
   if (!rec) return { error: 'Aula recorrente não encontrada.' }
+
+  // Autorização: o próprio aluno da aula OU um admin podem cancelar
+  const isOwnerStudent = rec.student_id === user.id
+  if (!isAnyAdmin && !isOwnerStudent) {
+    return { error: 'Você não tem permissão para cancelar esta aula.' }
+  }
 
   const [sh, sm] = rec.start_time.split(':').map(Number)
   const [eh, em] = rec.end_time.split(':').map(Number)
@@ -383,8 +394,20 @@ export async function cancelRecurringClassInstance(syntheticId: string, reason: 
     replacement_credits: (studentProfile?.replacement_credits || 0) + 1
   }).eq('id', rec.student_id)
 
+  // Notificar aluno se for o admin que cancelou
+  if (isAnyAdmin && !isOwnerStudent) {
+    await createNotification({
+      userId: rec.student_id,
+      type: 'class_cancelled',
+      title: 'Aula cancelada pelo professor',
+      body: `Uma aula foi cancelada. 1 crédito de reposição foi adicionado à sua conta.${reason ? ` Motivo: ${reason}` : ''}`,
+      metadata: { syntheticId, reason },
+    })
+  }
+
   revalidatePath('/admin/agenda')
   revalidatePath('/dashboard/profile')
+  revalidatePath('/dashboard/minhas-aulas')
   return { success: true }
 }
 
@@ -420,10 +443,20 @@ export async function cancelAppointmentByTeacher(id: string, reason: string) {
   if (apt.student_id) {
     const { data: studentProfile } = await supabase.from('profiles').select('replacement_credits').eq('id', apt.student_id).single()
     await supabase.from('profiles').update({ replacement_credits: (studentProfile?.replacement_credits || 0) + 1 }).eq('id', apt.student_id)
+
+    // Notificar aluno
+    await createNotification({
+      userId: apt.student_id,
+      type: 'class_cancelled',
+      title: 'Aula cancelada pelo professor',
+      body: `Sua aula foi cancelada e 1 crédito de reposição foi adicionado.${reason ? ` Motivo: ${reason}` : ''}`,
+      metadata: { appointmentId: id, reason },
+    })
   }
 
   revalidatePath('/admin/agenda')
   revalidatePath('/dashboard/profile')
+  revalidatePath('/dashboard/minhas-aulas')
   return { success: true }
 }
 

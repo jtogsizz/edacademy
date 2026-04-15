@@ -3,8 +3,14 @@ import './globals.css'
 import FaqPopout from '@/components/FaqPopout'
 
 export const metadata: Metadata = {
-  title: 'EdAcademy',
-  description: 'Gestão Inteligente de Alunos de Inglês',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://edacademy.app'),
+  title: { default: 'EdAcademy', template: '%s | EdAcademy' },
+  description: 'Plataforma de aulas de inglês e espanhol com acompanhamento individualizado, agenda integrada e suporte personalizado.',
+  keywords: ['inglês', 'espanhol', 'aulas online', 'EdAcademy', 'idiomas'],
+  openGraph: {
+    siteName: 'EdAcademy',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'https://edacademy.app',
+  },
 }
 
 export default function RootLayout({

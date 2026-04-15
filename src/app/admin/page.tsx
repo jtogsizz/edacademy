@@ -1,8 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import Feed from '@/components/Feed'
 import LogoutButton from '@/components/LogoutButton'
+import NotificationBell from '@/components/NotificationBell'
 
 export default async function AdminFeedPage() {
   const supabase = await createClient()
@@ -23,8 +23,8 @@ export default async function AdminFeedPage() {
           <h2>Feed Administrativo</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Crie publicações e gerencie suas aulas.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <Link href="/admin/agenda" className="btn-primary" style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem' }}>Minha Agenda</Link>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <NotificationBell href="/admin/notifications" />
           <LogoutButton />
         </div>
       </header>

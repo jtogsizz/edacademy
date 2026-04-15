@@ -311,3 +311,43 @@ export async function deleteUserAccount(targetUserId: string) {
     return { error: 'Erro grave: ' + err.message }
   }
 }
+
+/**
+ * Salva as configurações de PIX estático na tabela settings.
+ * Apenas admin_master pode alterar.
+ */
+export async function updatePixConfig(data: {
+  pix_key: string | null
+  pix_key_type: string | null
+  pix_beneficiary_name: string | null
+  pix_qr_code_url: string | null
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin_master') return { error: 'Acesso restrito' }
+
+  // Busca o id da row de settings (pode ser que exista apenas uma)
+  const { data: existing } = await supabase.from('settings').select('id').maybeSingle()
+
+  const payload = {
+    pix_key: data.pix_key || null,
+    pix_key_type: data.pix_key_type || null,
+    pix_beneficiary_name: data.pix_beneficiary_name || null,
+    pix_qr_code_url: data.pix_qr_code_url || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  let error
+  if (existing?.id) {
+    ;({ error } = await supabase.from('settings').update(payload).eq('id', existing.id))
+  } else {
+    ;({ error } = await supabase.from('settings').insert(payload))
+  }
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/profile')
+  return { success: true }
+}

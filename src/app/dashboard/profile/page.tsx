@@ -2,12 +2,11 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
-import { format } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
 import RecurringClassForm from './RecurringClassForm'
-import { getUnifiedStudentAgenda } from '@/utils/agendaUtils'
+import PixPaymentModal from '@/components/PixPaymentModal'
 import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
 import { cookies } from 'next/headers'
@@ -47,6 +46,19 @@ export default async function StudentProfilePage() {
 
   const isActive = subscription?.status === 'active'
 
+  // Calcula alertas de vencimento
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  let daysUntilExpiry: number | null = null
+  if (subscription?.end_date) {
+    const expiry = new Date(subscription.end_date)
+    expiry.setHours(0, 0, 0, 0)
+    daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  }
+  const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0
+  const isUrgent = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 3
+  const isWarning = daysUntilExpiry !== null && daysUntilExpiry > 3 && daysUntilExpiry <= 7
+
   // 1. Buscar Professores Disponíveis — filtrar pelo idioma do aluno
   let teachersQuery = supabase
     .from('profiles')
@@ -60,44 +72,17 @@ export default async function StudentProfilePage() {
 
   const { data: teachers } = await teachersQuery
 
-  // 2. Buscar Horários Fixos (Recorrência) do aluno
+  // 3. Buscar Agendamentos (apenas para exibir créditos e horários fixos)
   const { data: recurring } = await supabase
     .from('recurring_classes')
     .select('*, teacher:profiles!recurring_classes_teacher_id_fkey(id, full_name)')
     .eq('student_id', user.id)
 
-  // 3. Buscar Agendamentos Reais (Appointments)
-  const { data: appointments } = await supabase
-    .from('appointments')
-    .select(`
-      id,
-      start_time,
-      end_time,
-      status,
-      teacher:profiles!appointments_teacher_id_fkey (
-        id,
-        full_name,
-        whatsapp_number
-      )
-    `)
-    .eq('student_id', user.id)
-    .order('start_time', { ascending: true })
-
-  // 4. Gerar Agenda Unificada (Recorrência + Appointments)
-  const unifiedAgenda = getUnifiedStudentAgenda(
-    user.id,
-    recurring || [],
-    appointments || [],
-    30 // Ver próximos 30 dias
-  )
-
-  const { data: settings } = await supabase
+  // Buscar config PIX (para exibir botão de pagamento)
+  const { data: pixSettings } = await supabase
     .from('settings')
-    .select('fixed_meet_link')
-    .single()
-
-  const meetLink = settings?.fixed_meet_link || 'https://meet.google.com/'
-  const daysLabels = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+    .select('pix_key, pix_key_type, pix_beneficiary_name, pix_qr_code_url')
+    .maybeSingle()
 
   return (
     <div className="container" style={{ padding: '2rem 1.5rem', paddingBottom: '6rem', maxWidth: '1000px' }}>
@@ -182,9 +167,39 @@ export default async function StudentProfilePage() {
 
           {/* Vencimento */}
           {subscription?.end_date && (
-            <div style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Válido até</div>
-              <div style={{ fontWeight: 600 }}>{new Date(subscription.end_date).toLocaleDateString('pt-BR')}</div>
+            <div style={{
+              padding: '0.85rem 1rem',
+              backgroundColor: isExpired ? 'rgba(239,68,68,0.07)' : isUrgent ? 'rgba(239,68,68,0.07)' : isWarning ? 'rgba(234,179,8,0.07)' : 'var(--bg-main)',
+              borderRadius: 'var(--radius-md)',
+              border: isExpired || isUrgent ? '1.5px solid rgba(239,68,68,0.35)' : isWarning ? '1.5px solid rgba(234,179,8,0.35)' : '1px solid var(--border)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Válido até</div>
+                  <div style={{ fontWeight: 600, color: isExpired || isUrgent ? 'var(--error)' : isWarning ? '#CA8A04' : 'var(--text-main)' }}>
+                    {new Date(subscription.end_date).toLocaleDateString('pt-BR')}
+                  </div>
+                </div>
+                {isExpired && (
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '99px', backgroundColor: 'rgba(239,68,68,0.15)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)', letterSpacing: '0.04em' }}>VENCIDO</span>
+                )}
+                {isUrgent && !isExpired && (
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '99px', backgroundColor: 'rgba(239,68,68,0.15)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)', letterSpacing: '0.04em' }}>URGENTE · {daysUntilExpiry}d</span>
+                )}
+                {isWarning && !isUrgent && (
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '99px', backgroundColor: 'rgba(234,179,8,0.15)', color: '#CA8A04', border: '1px solid rgba(234,179,8,0.3)', letterSpacing: '0.04em' }}>ATENÇÃO · {daysUntilExpiry}d</span>
+                )}
+              </div>
+              {(isExpired || isUrgent || isWarning) && (
+                <p style={{ fontSize: '0.78rem', marginTop: '0.5rem', color: isExpired || isUrgent ? 'var(--error)' : '#CA8A04', fontWeight: 500, lineHeight: 1.4 }}>
+                  {isExpired
+                    ? 'Seu plano venceu. Entre em contato para renovar e continuar as aulas.'
+                    : isUrgent
+                    ? `Seu plano vence em ${daysUntilExpiry === 0 ? 'hoje' : `${daysUntilExpiry} dia${daysUntilExpiry === 1 ? '' : 's'}`}! Renove para não perder as aulas.`
+                    : `Seu plano vence em ${daysUntilExpiry} dias. Programe a renovação com antecedência.`
+                  }
+                </p>
+              )}
             </div>
           )}
 
@@ -193,9 +208,20 @@ export default async function StudentProfilePage() {
               Para ativar seu acesso, entre em contato com a equipe EdAcademy.
             </p>
           )}
+
+          {/* Botão PIX — aparece quando admin_master configurou a chave */}
+          {pixSettings?.pix_key && (
+            <div style={{ marginTop: '1.25rem' }}>
+              <PixPaymentModal pix={{
+                pix_key: pixSettings.pix_key,
+                pix_key_type: pixSettings.pix_key_type ?? null,
+                pix_beneficiary_name: pixSettings.pix_beneficiary_name ?? null,
+                pix_qr_code_url: pixSettings.pix_qr_code_url ?? null,
+              }} />
+            </div>
+          )}
         </section>
       </div>
-
 
       {/* Recorrência Section */}
       <section className="card" style={{ marginBottom: '3rem', border: '1px solid var(--primary-light)' }}>
@@ -252,118 +278,34 @@ export default async function StudentProfilePage() {
         </div>
       </section>
 
-      {/* Aulas Marcadas (Agenda Unificada) */}
-      <h3 style={{ fontSize: '1.4rem', marginBottom: '1.5rem' }}>Próximas Aulas Agendadas</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {unifiedAgenda.length > 0 ? (
-          unifiedAgenda.map((apt: any) => {
-            const start = new Date(apt.start_time)
-            const end = new Date(apt.end_time)
-            const now = new Date()
-            // Liberar acesso 10 min antes do início e durante toda a aula
-            const earlyEntry = new Date(start.getTime() - 10 * 60 * 1000)
-            const canEnter = now >= earlyEntry && now <= end
-            const isOngoing = now >= start && now <= end
-            const teacher = apt.teacher
-            const displayStart = new Date(start.getTime() + 10 * 60 * 1000)
-            const isCancelled = apt.status === 'cancelled'
-
-            return (
-              <div 
-                key={apt.id} 
-                className="card" 
-                style={{ 
-                  padding: '1.2rem', 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  flexWrap: 'wrap', 
-                  gap: '1.5rem', 
-                  borderLeft: isCancelled ? '4px solid var(--text-muted)' : `4px solid ${apt.is_recurring ? 'var(--primary)' : '#EAB308'}`,
-                  opacity: isCancelled ? 0.6 : 1,
-                  backgroundColor: isCancelled ? 'var(--bg-main)' : (apt.is_recurring ? 'var(--bg-card)' : 'rgba(234, 179, 8, 0.05)'),
-                  filter: isCancelled ? 'grayscale(1)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'center', minWidth: '45px', borderRight: '1px solid var(--border)', paddingRight: '1rem' }}>
-                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{formatInTimeZone(start, userTz, 'MMM', { locale: ptBR })}</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: isCancelled ? 'var(--text-muted)' : 'var(--primary)' }}>{formatInTimeZone(start, userTz, 'dd')}</div>
-                  </div>
-                  <div>
-                    <div style={{ 
-                      fontSize: '0.75rem', 
-                      color: isCancelled ? 'var(--error)' : (apt.is_recurring ? 'var(--text-muted)' : '#CA8A04'), 
-                      marginBottom: '0.2rem', 
-                      fontWeight: (isCancelled || !apt.is_recurring) ? 700 : 400 
-                    }}>
-                      {isCancelled ? '● AULA CANCELADA / REMARCADA' : (apt.is_recurring ? 'AULA FIXA DO PLANO' : 'AULA DE REPOSIÇÃO / EXTRA')}
-                    </div>
-                    <div style={{ fontWeight: 600, textDecoration: isCancelled ? 'line-through' : 'none' }}>
-                      <>{formatInTimeZone(displayStart, userTz, 'HH:mm')} - {formatInTimeZone(end, userTz, 'HH:mm')} <span style={{fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px'}}>{!isFallback ? '(seu fuso)' : '(padrão BR)'}</span></>
-                    </div>
-                    <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Prof. {teacher?.full_name}</div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  {isCancelled ? (
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>Indisponível</span>
-                  ) : (
-                    <>
-                      {!isOngoing && (
-                        <Link 
-                          href={`/dashboard/schedule?teacher_id=${teacher?.id}&reschedule_id=${apt.id}`}
-                          className="btn-outline"
-                          style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem', fontSize: '0.85rem', textDecoration: 'none' }}
-                        >
-                          Remarcar
-                        </Link>
-                      )}
-                      <a 
-                        href={canEnter ? meetLink : '#'}
-                        target={canEnter ? "_blank" : undefined}
-                        rel={canEnter ? "noopener noreferrer" : undefined}
-                        className={`btn-primary ${!canEnter && 'disabled'}`}
-                        style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
-                      >
-                        {isOngoing ? 'Entrar na Aula' : canEnter ? 'Sala aberta' : 'Aula inicia em breve'}
-                      </a>
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          })
-        ) : (
-          <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Nenhuma aula encontrada para os próximos 30 dias.
+      {/* Atalho para Minhas Aulas */}
+      <Link
+        href="/dashboard/minhas-aulas"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '1.25rem 1.5rem',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-md)',
+          textDecoration: 'none',
+          marginBottom: '1.5rem',
+          transition: 'box-shadow 0.2s',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span style={{ fontSize: '1.5rem' }}>📅</span>
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1rem' }}>Minhas Aulas</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+              Ver próximas aulas e histórico completo
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+        <span style={{ color: 'var(--primary)', fontSize: '1.2rem' }}>→</span>
+      </Link>
 
-      <div style={{ marginTop: '2.5rem', textAlign: 'center' }}>
-        {(profile?.replacement_credits || 0) > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-            <Link href="/dashboard/schedule" className="btn-primary" style={{ display: 'inline-flex', padding: '1rem 3rem' }}>
-              Agendar Aula Extra
-            </Link>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Você possui {profile.replacement_credits} crédito(s) disponível(is).</p>
-          </div>
-        ) : (
-          <div style={{ padding: '2rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-main)' }}>
-            <button className="btn-primary disabled" style={{ cursor: 'not-allowed', opacity: 0.5, padding: '1.2rem 3rem' }}>
-              Agendar Aula Extra (Indisponível)
-            </button>
-            <p style={{ marginTop: '1rem', color: 'var(--error)', fontSize: '0.9rem', fontWeight: 500 }}>
-              Você não possui créditos de reposição no momento.
-            </p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-              Créditos são gerados automaticamente quando o professor desmarcar sua aula.
-            </p>
-          </div>
-        )}
-      </div>
 
       <style dangerouslySetInnerHTML={{__html: `
         @media (max-width: 600px) {

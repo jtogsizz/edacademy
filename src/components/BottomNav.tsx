@@ -2,26 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, User } from "lucide-react";
+import { Home, MessageCircle, User, CalendarDays, Bell } from "lucide-react";
 import styles from "./BottomNav.module.css";
-
-// Este componente precisa saber se o usuário é admin ou aluno para redirecionar para a base certa
-// ou podemos criar rotas unificadas: /dashboard, /chat, /profile
-// Por enquanto, recebemos o base_path como prop ou inferimos da URL atual.
-// // melhorar esse fluxo depois caso unifiquemos as rotas de aluno e admin.
 
 export default function BottomNav({ role }: { role?: string }) {
   const pathname = usePathname();
   
-  // Se não foi passado role, tenta adivinhar pela URL (ex: /admin/...)
   const isProfileAdmin = role === 'admin' || role === 'admin_master' || pathname?.startsWith('/admin');
-  const basePath = isProfileAdmin ? '/admin' : '/dashboard';
 
-  const navItems = [
-    { name: "Dashboard", href: `${basePath}`, icon: Home },
-    { name: "Chat", href: `${basePath}/chat`, icon: MessageCircle },
-    { name: "Perfil", href: `${basePath}/profile`, icon: User },
-  ];
+  const navItems = isProfileAdmin
+    ? [
+        { name: 'Dashboard',    href: '/admin',               icon: Home },
+        { name: 'Minhas Aulas', href: '/admin/agenda',        icon: CalendarDays },
+        { name: 'Chat',         href: '/admin/chat',          icon: MessageCircle },
+        { name: 'Perfil',       href: '/admin/profile',       icon: User },
+      ]
+    : [
+        { name: 'Início',       href: '/dashboard',           icon: Home },
+        { name: 'Minhas Aulas', href: '/dashboard/minhas-aulas', icon: CalendarDays },
+        { name: 'Chat',         href: '/dashboard/chat',      icon: MessageCircle },
+        { name: 'Perfil',       href: '/dashboard/profile',   icon: User },
+      ]
+
 
   return (
     <>
@@ -33,7 +35,9 @@ export default function BottomNav({ role }: { role?: string }) {
           {navItems.map((item) => {
             const Icon = item.icon;
             // Verifica se é ativo. Para o dashboard base, precisa ser exato ou quase exato
-            const isActive = pathname === item.href;
+            const isActive = item.href === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname?.startsWith(item.href)
 
             return (
               <li key={item.name} className={styles.navItem}>

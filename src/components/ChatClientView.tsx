@@ -70,15 +70,16 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerI
 
           if (!isThisConversation) return
 
-          // evita duplicar mensagem que o proprio usuario ja adicionou otimisticamente
+          // evita duplicar messagem que o proprio usuario ja adicionou otimisticamente
           setMessages(prev => {
             const alreadyExists = prev.some(m => m.id === newMsg.id)
             if (alreadyExists) return prev
-            // tb remove o fake otimístico se for msg propria (troca pelo id real)
-            const withoutFakes = newMsg.sender_id === myUserId
-              ? prev.filter(m => !m.id.includes('-') || m.id === newMsg.id)
+            // Remove o fake otimistico (identificado pelo prefixo 'fake-') quando o real chegar
+            // Isso é seguro porque UUIDs reais do Supabase NUNCA começam com 'fake-'
+            const withoutFake = newMsg.sender_id === myUserId
+              ? prev.filter(m => !m.id.startsWith('fake-'))
               : prev
-            return [...withoutFakes, newMsg]
+            return [...withoutFake, newMsg]
           })
         }
       )
@@ -92,7 +93,8 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerI
   // atualizo local de forma optimística pro envio nao ficar engasgando o visual
   const handleSend = async (val: string, type: 'text' | 'emoji') => {
     if (!val.trim()) return
-    const fakeId = Math.random().toString()
+    // Prefixo inequívoco para não colidir com UUIDs reais do Supabase (que também têm hífens)
+    const fakeId = `fake-${Date.now()}-${Math.random()}`
     
     setMessages(prev => [...prev, {
       id: fakeId,

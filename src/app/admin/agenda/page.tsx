@@ -2,14 +2,16 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
-import { format, addDays, addWeeks, getDay, startOfDay, isBefore } from 'date-fns'
+import { format } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import { cookies } from 'next/headers'
 import AdminCancellationControls from './AdminCancellationControls'
+import TeacherSelector from './TeacherSelector'
 import { getUnifiedTeacherAgenda } from '@/utils/agendaUtils'
 
-export default async function TeacherAgendaPage() {
+export default async function TeacherAgendaPage({ searchParams }: { searchParams: Promise<{ teacher_id?: string }> }) {
+  const { teacher_id: qTeacherId } = await searchParams
   const supabase = await createClient()
   const cookieStore = await cookies()
   const clientTz = cookieStore.get('client_tz')?.value
@@ -20,6 +22,27 @@ export default async function TeacherAgendaPage() {
   if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
 
   const isAdminMaster = profile?.role === 'admin_master'
+
+  // Admin Master pode selecionar professor pelo query param; admin regular vê apenas a própria agenda
+  let viewingTeacherId = user.id
+  let teacherList: { id: string; full_name: string }[] = []
+
+  if (isAdminMaster) {
+    const { data: teachers } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('role', ['admin', 'admin_master'])
+      .order('full_name')
+    teacherList = teachers || []
+    // Usa o query param se for um ID válido da lista, caso contrário cai para o próprio usuário
+    if (qTeacherId && teacherList.some(t => t.id === qTeacherId)) {
+      viewingTeacherId = qTeacherId
+    }
+  }
+
+  const viewingTeacher = isAdminMaster
+    ? teacherList.find(t => t.id === viewingTeacherId) || { full_name: 'Minha Agenda' }
+    : null
 
   const userTz = profile?.timezone || clientTz || 'America/Sao_Paulo'
   const isFallback = !profile?.timezone && !clientTz
@@ -37,10 +60,7 @@ export default async function TeacherAgendaPage() {
       student:profiles!appointments_student_id_fkey ( id, full_name, whatsapp_number )
     `)
     .order('start_time', { ascending: true })
-
-  if (!isAdminMaster) {
-    appointmentsQuery = appointmentsQuery.eq('teacher_id', user.id)
-  }
+    .eq('teacher_id', viewingTeacherId)
 
   const { data: appointments } = await appointmentsQuery
 
@@ -56,16 +76,13 @@ export default async function TeacherAgendaPage() {
       teacher:profiles!recurring_classes_teacher_id_fkey ( id, full_name ),
       student:profiles!recurring_classes_student_id_fkey ( id, full_name, whatsapp_number )
     `)
-
-  if (!isAdminMaster) {
-    recurringQuery = recurringQuery.eq('teacher_id', user.id)
-  }
+    .eq('teacher_id', viewingTeacherId)
 
   const { data: recurringClasses } = await recurringQuery
 
   // 3. Unificar e ordenar usando a lógica centralizada
   const allAppointments = getUnifiedTeacherAgenda(
-    user.id,
+    viewingTeacherId,
     recurringClasses || [],
     appointments || [],
     30
@@ -91,8 +108,15 @@ export default async function TeacherAgendaPage() {
           <Link href="/admin" style={{ color: 'var(--text-muted)', textDecoration: 'underline', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
             &larr; Voltar ao Início
           </Link>
-          <h2 style={{ fontSize: '1.8rem', margin: 0, color: 'var(--primary)' }}>Minha Agenda de Aulas</h2>
-          <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>Acompanhe e gerencie as aulas do dia.</p>
+          <h2 style={{ fontSize: '1.8rem', margin: 0, color: 'var(--primary)' }}>
+            {isAdminMaster && viewingTeacher ? `Agenda: ${viewingTeacher.full_name}` : 'Minha Agenda de Aulas'}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>Acompanhe e gerencie as aulas do período.</p>
+          {isAdminMaster && teacherList.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <TeacherSelector teachers={teacherList} selectedId={viewingTeacherId} />
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <AdminCancellationControls dateStr={todayStr} type="day" />
