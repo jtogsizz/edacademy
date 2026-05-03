@@ -1,15 +1,20 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import FaqPopout from '@/components/FaqPopout'
+import UserProfileDrawer from '@/components/UserProfileDrawer'
+import { Suspense } from 'react'
+import { getAppUrl } from '@/utils/url'
+
+const appUrl = getAppUrl()
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://edacademy.app'),
+  metadataBase: new URL(appUrl),
   title: { default: 'EdAcademy', template: '%s | EdAcademy' },
   description: 'Plataforma de aulas de inglês e espanhol com acompanhamento individualizado, agenda integrada e suporte personalizado.',
   keywords: ['inglês', 'espanhol', 'aulas online', 'EdAcademy', 'idiomas'],
   openGraph: {
     siteName: 'EdAcademy',
-    url: process.env.NEXT_PUBLIC_APP_URL || 'https://edacademy.app',
+    url: appUrl,
   },
 }
 
@@ -24,18 +29,6 @@ export default function RootLayout({
         <main style={{ flex: 1 }}>
           {children}
         </main>
-        
-        <footer style={{ 
-          padding: '2rem 1.5rem', 
-          borderTop: '1px solid var(--border)', 
-          textAlign: 'center',
-          backgroundColor: 'var(--bg-card)',
-          marginTop: 'auto'
-        }}>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            &copy; 2026 EdAcademy. Todos os direitos reservados.
-          </p>
-        </footer>
 
         {/* Links Fixos Sociais - Canto Inferior Esquerdo */}
         <div style={{ position: 'fixed', bottom: '80px', left: '16px', zIndex: 99, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -88,6 +81,11 @@ export default function RootLayout({
 
         {/* Global FAQ Popout */}
         <FaqPopout />
+
+        {/* Global User Profile Drawer */}
+        <Suspense fallback={null}>
+          <UserProfileDrawer />
+        </Suspense>
       </body>
     </html>
   )

@@ -120,12 +120,23 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerI
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: 'var(--bg-main)' }}>
         
         {/* Topbar Fixa do Chat */}
-        <header style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
-          <Link href={backHref} className="md-hidden" style={{ fontSize: '1.25rem', color: 'var(--primary)', textDecoration: 'none' }}>
-             &larr;
+        <header style={{ 
+          padding: '1rem 1.5rem', 
+          backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid var(--border)', 
+          display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0,
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+        }}>
+          <Link href={backHref} className="md-hidden" style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', backgroundColor: 'var(--bg-hover)', color: 'var(--text-main)', textDecoration: 'none', transition: 'all 0.2s' }}>
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </Link>
-          <img src={partnerAvatar} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>{chatPartnerName}</h2>
+          <Link href={`?viewUser=${chatPartnerId}`} scroll={false} style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
+            <img src={partnerAvatar} alt="Avatar" style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+            <div>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0, transition: 'color 0.2s' }} className="hover:text-[var(--primary)]">{chatPartnerName}</h2>
+            </div>
+          </Link>
         </header>
 
         {/* Historico do Chat (Scrollable Area) */}
@@ -168,14 +179,15 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerI
         </div>
 
         {/* Bottom Input Area Fixo */}
-        <div style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border)', flexShrink: 0, paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', paddingBottom: '0.5rem' }}>
+        <div style={{ padding: '1rem 1.5rem', backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border)', flexShrink: 0, paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', paddingBottom: '0.75rem' }}>
             {MOCK_EMOJIS.map(emo => (
               <button 
                 key={emo} 
                 onClick={() => handleSend(emo, 'emoji')}
                 disabled={loading}
-                style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', outline: 'none', transition: 'transform 0.1s' }}
+                className="btn-outline"
+                style={{ padding: '0.4rem', fontSize: '1.25rem', borderRadius: '50%', width: '40px', height: '40px' }}
                 title="Sticker rápido"
               >
                 {emo}
@@ -185,22 +197,23 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerI
 
           <form 
              onSubmit={(e) => { e.preventDefault(); handleSend(content, 'text') }} 
-             style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+             style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}
           >
             <input 
               type="text"
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="Digite uma mensagem..."
-              style={{ flex: 1, padding: '0.8rem 1.25rem', borderRadius: '9999px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }}
+              style={{ flex: 1, padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-hover)', color: 'var(--text-main)', outline: 'none', transition: 'all 0.2s', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)' }}
               disabled={loading}
             />
             <button 
                type="submit" 
                disabled={loading || !content.trim()} 
-               style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: content.trim() ? 'pointer' : 'not-allowed', opacity: content.trim() ? 1 : 0.5 }}
+               className="btn-primary"
+               style={{ width: '48px', height: '48px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: content.trim() ? 'pointer' : 'not-allowed', opacity: content.trim() ? 1 : 0.5 }}
             >
-              <SendIcon size={18} />
+              <SendIcon size={20} />
             </button>
           </form>
         </div>

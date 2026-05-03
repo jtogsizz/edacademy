@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
         hostname: 'jjwiytsirkmyhcfcsfgg.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
+      // Google OAuth avatars (foto de perfil do Google)
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
       // Produção
       {
         protocol: 'https',

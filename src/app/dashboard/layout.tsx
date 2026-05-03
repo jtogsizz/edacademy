@@ -23,10 +23,10 @@ export default async function DashboardLayout({
   }
 
   if (profile && profile.is_active === false) {
-    redirect('/inactive-account')
+    redirect('/meus-eventos')
   }
 
-  if (profile?.role === 'admin' || profile?.role === 'admin_master') {
+  if (profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev') {
     redirect('/admin')
   }
 

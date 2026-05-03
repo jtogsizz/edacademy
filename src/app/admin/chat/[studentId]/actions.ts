@@ -9,7 +9,7 @@ export async function sendMessageToStudent(studentId: string, content: string, t
   if (!user) return { error: 'Não autorizado' }
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') return { error: 'Não autorizado' }
+  if (profile?.role !== 'admin' && profile?.role !== 'admin_master' && profile?.role !== 'suporte' && profile?.role !== 'dev') return { error: 'Não autorizado' }
 
   const { error } = await supabase.from('messages').insert({
     sender_id: user.id,

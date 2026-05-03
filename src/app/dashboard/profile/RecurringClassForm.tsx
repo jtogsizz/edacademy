@@ -48,11 +48,14 @@ export default function RecurringClassForm({ teachers, userTimezone = 'America/S
     setSubmitting(true)
     setError(null)
     
-    const res = await addRecurringClass(utcStartISO, selectedTeacher)
+    const res = await addRecurringClass(utcStartISO, selectedTeacher) as any
     if (res.error) {
       setError(res.error)
       setSubmitting(false)
     } else {
+      if (res.grantedCredits > 0) {
+        window.alert(`Horário fixo definido com sucesso!\n\nDetectamos que este horário possui ${res.absenceCount} ausências futuras do professor e ${res.appointmentConflictCount} conflitos de agenda.\n\nPor isso, adicionamos ${res.grantedCredits} créditos de reposição automaticamente na sua conta para que você não perca essas aulas.`);
+      }
       router.refresh()
       setSubmitting(false)
     }
@@ -124,22 +127,31 @@ export default function RecurringClassForm({ teachers, userTimezone = 'America/S
                   <div key={dayIdx} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '0.5rem' }}>
                     <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--primary)' }}>{localDayName} <span style={{fontSize: '0.7rem', color: 'var(--text-muted)'}}>({userTimezone})</span></div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
-                      {slots.map((slot, sIdx) => (
-                        <button
-                          key={sIdx}
-                          disabled={submitting}
-                          onClick={() => handleAdd(slot.utcStartISO)}
-                          className="btn-outline hover-fx"
-                          style={{ 
-                            padding: '0.5rem', 
-                            fontSize: '0.8rem', 
-                            textAlign: 'center',
-                            opacity: submitting ? 0.6 : 1
-                          }}
-                        >
-                          {slot.localLabel}
-                        </button>
-                      ))}
+                      {slots.map((slot, sIdx) => {
+                        const isOccupied = slot.isOccupied;
+                        const isMyClass = slot.isMyClass;
+                        
+                        return (
+                          <button
+                            key={sIdx}
+                            disabled={submitting || isOccupied || isMyClass}
+                            onClick={() => handleAdd(slot.utcStartISO)}
+                            className={`btn-outline ${!isOccupied && !isMyClass ? 'hover-fx' : ''}`}
+                            style={{ 
+                              padding: '0.5rem', 
+                              fontSize: '0.8rem', 
+                              textAlign: 'center',
+                              opacity: submitting || isMyClass ? 0.6 : 1,
+                              backgroundColor: isOccupied ? 'rgba(245, 158, 11, 0.1)' : isMyClass ? 'rgba(79, 70, 229, 0.1)' : 'var(--bg-card)',
+                              borderColor: isOccupied ? '#f59e0b' : isMyClass ? 'var(--primary)' : 'var(--border)',
+                              color: isOccupied ? '#d97706' : isMyClass ? 'var(--primary)' : 'var(--text-main)',
+                              cursor: isOccupied || isMyClass ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {slot.localLabel} {isOccupied ? ' (Ocupado)' : isMyClass ? ' (Seu Plano)' : ''}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )

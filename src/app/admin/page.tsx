@@ -12,7 +12,7 @@ export default async function AdminFeedPage() {
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') {
+  if (profile?.role !== 'admin' && profile?.role !== 'admin_master' && profile?.role !== 'suporte' && profile?.role !== 'dev') {
     redirect('/dashboard')
   }
 

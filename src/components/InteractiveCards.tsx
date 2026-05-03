@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface CardData {
   id: number;
@@ -8,76 +8,20 @@ interface CardData {
   y: number;
   vx: number;
   vy: number;
-  width: number;
-  height: number;
-  content: React.ReactNode;
-  color: string;
+  size: number;
+  flag: string;
 }
 
 const InteractiveCards: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const cardsRef = useRef<CardData[]>([
-    {
-      id: 1,
-      x: 50,
-      y: 100,
-      vx: (Math.random() - 0.5) * 0.8,
-      vy: (Math.random() - 0.5) * 0.8,
-      width: 180,
-      height: 70,
-      color: 'rgba(234, 88, 12, 0.1)',
-      content: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-          </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>Aula ao vivo</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Módulo Avançado</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 2,
-      x: 300,
-      y: 300,
-      vx: (Math.random() - 0.5) * 0.8,
-      vy: (Math.random() - 0.5) * 0.8,
-      width: 180,
-      height: 70,
-      color: '#E0E7FF',
-      content: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#E0E7FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4F46E5' }}>Nova mensagem</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Professor Ed</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 3,
-      x: 100,
-      y: 200,
-      vx: (Math.random() - 0.5) * 0.8,
-      vy: (Math.random() - 0.5) * 0.8,
-      width: 160,
-      height: 60,
-      color: '#F0FDF4',
-      content: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#16A34A' }}>Feedback enviado</div>
-        </div>
-      ),
-    },
+    { id: 1, x: 100, y: 100, vx: 0.1, vy: 0.1, size: 100, flag: '/flags/usa.png' },
+    { id: 2, x: 300, y: 250, vx: -0.1, vy: 0.1, size: 110, flag: '/flags/spain.png' },
+    { id: 3, x: 150, y: 400, vx: 0.1, vy: -0.1, size: 95, flag: '/flags/france.png' },
+    { id: 4, x: 500, y: 150, vx: -0.1, vy: -0.1, size: 105, flag: '/flags/italy.png' },
+    { id: 5, x: 600, y: 350, vx: 0.1, vy: 0.1, size: 90, flag: '/flags/germany.png' },
+    { id: 6, x: 750, y: 200, vx: -0.1, vy: 0.1, size: 100, flag: '/flags/uk.png' },
   ]);
 
   const draggingRef = useRef<number | null>(null);
@@ -95,80 +39,77 @@ const InteractiveCards: React.FC = () => {
       const containerW = containerRect.width;
       const containerH = containerRect.height;
 
-      // Update positions
       cards.forEach((card, index) => {
         if (draggingRef.current === card.id) return;
 
-        card.vx *= 0.995;
-        card.vy *= 0.995;
-        card.vx += (Math.random() - 0.5) * 0.005;
-        card.vy += (Math.random() - 0.5) * 0.005;
+        card.vx *= 0.998;
+        card.vy *= 0.998;
+        card.vx += (Math.random() - 0.5) * 0.003;
+        card.vy += (Math.random() - 0.5) * 0.003;
 
-        const minVelocity = 0.15;
+        const minVelocity = 0.1;
+        const maxVelocity = 0.4;
+        
         if (Math.abs(card.vx) < minVelocity) card.vx = card.vx >= 0 ? minVelocity : -minVelocity;
         if (Math.abs(card.vy) < minVelocity) card.vy = card.vy >= 0 ? minVelocity : -minVelocity;
-
-        const maxVelocity = 0.6;
+        
         card.vx = Math.max(-maxVelocity, Math.min(maxVelocity, card.vx));
         card.vy = Math.max(-maxVelocity, Math.min(maxVelocity, card.vy));
 
         card.x += card.vx;
         card.y += card.vy;
 
-        if (card.x <= 0) {
+        if (card.x - card.size/2 <= 0) {
           card.vx = Math.abs(card.vx);
-          card.x = 0;
-        } else if (card.x + card.width >= containerW) {
+          card.x = card.size/2;
+        } else if (card.x + card.size/2 >= containerW) {
           card.vx = -Math.abs(card.vx);
-          card.x = containerW - card.width;
+          card.x = containerW - card.size/2;
         }
 
-        if (card.y <= 0) {
+        if (card.y - card.size/2 <= 0) {
           card.vy = Math.abs(card.vy);
-          card.y = 0;
-        } else if (card.y + card.height >= containerH) {
+          card.y = card.size/2;
+        } else if (card.y + card.size/2 >= containerH) {
           card.vy = -Math.abs(card.vy);
-          card.y = containerH - card.height;
+          card.y = containerH - card.size/2;
         }
 
         const el = cardElements.current[index];
         if (el) {
-          el.style.transform = `translate3d(${card.x}px, ${card.y}px, 0)`;
+          el.style.transform = `translate3d(${card.x - card.size/2}px, ${card.y - card.size/2}px, 0)`;
         }
       });
 
-      // Card-to-card collisions
       for (let i = 0; i < cards.length; i++) {
         for (let j = i + 1; j < cards.length; j++) {
           const c1 = cards[i];
           const c2 = cards[j];
 
-          const dx = (c1.x + c1.width / 2) - (c2.x + c2.width / 2);
-          const dy = (c1.y + c1.height / 2) - (c2.y + c2.height / 2);
+          const dx = c1.x - c2.x;
+          const dy = c1.y - c2.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          // Adjusted Hitbox for tighter collision (Final fine-tune)
-          const minDistance = (c1.width + c2.width) / 4.2;
+          const minDistance = (c1.size + c2.size) / 2;
 
           if (distance < minDistance) {
-            const tempVx = c1.vx;
-            const tempVy = c1.vy;
-            c1.vx = c2.vx * 1.05;
-            c1.vy = c2.vy * 1.05;
-            c2.vx = tempVx * 1.05;
-            c2.vy = tempVy * 1.05;
-
-            const overlap = minDistance - distance;
-            const nx = dx / distance;
-            const ny = dy / distance;
+            const angle = Math.atan2(dy, dx);
+            const targetX = c2.x + Math.cos(angle) * minDistance;
+            const targetY = c2.y + Math.sin(angle) * minDistance;
             
+            const ax = (targetX - c1.x) * 0.1;
+            const ay = (targetY - c1.y) * 0.1;
+
             if (draggingRef.current !== c1.id) {
-              c1.x += nx * overlap * 0.5;
-              c1.y += ny * overlap * 0.5;
+              c1.vx += ax;
+              c1.vy += ay;
+              c1.x += ax;
+              c1.y += ay;
             }
             if (draggingRef.current !== c2.id) {
-              c2.x -= nx * overlap * 0.5;
-              c2.y -= ny * overlap * 0.5;
+              c2.vx -= ax;
+              c2.vy -= ay;
+              c2.x -= ax;
+              c2.y -= ay;
             }
           }
         }
@@ -197,13 +138,13 @@ const InteractiveCards: React.FC = () => {
     if (card) {
       card.x += dx;
       card.y += dy;
-      card.vx = dx * 0.2;
-      card.vy = dy * 0.2;
+      card.vx = dx * 0.1;
+      card.vy = dy * 0.1;
 
       const index = cardsRef.current.indexOf(card);
       const el = cardElements.current[index];
       if (el) {
-        el.style.transform = `translate3d(${card.x}px, ${card.y}px, 0)`;
+        el.style.transform = `translate3d(${card.x - card.size/2}px, ${card.y - card.size/2}px, 0)`;
       }
     }
 
@@ -238,21 +179,46 @@ const InteractiveCards: React.FC = () => {
           onPointerMove={(e) => handlePointerMove(e, card.id)}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className="floating-card glass-effect"
           style={{
             position: 'absolute',
             left: 0,
             top: 0,
-            transform: `translate3d(${card.x}px, ${card.y}px, 0)`,
+            width: card.size,
+            height: card.size,
+            borderRadius: '50%',
+            background: '#FFFFFF',
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 15px 35px rgba(0,0,0,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             pointerEvents: 'auto',
             cursor: 'grab',
             userSelect: 'none',
             touchAction: 'none',
             transition: 'none',
-            willChange: 'transform'
+            willChange: 'transform',
+            zIndex: 10,
+            overflow: 'hidden'
           }}
         >
-          {card.content}
+          <img 
+            src={card.flag} 
+            alt="Flag" 
+            draggable={false}
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover',
+              borderRadius: '50%',
+              padding: '12px',
+              pointerEvents: 'none',
+              userSelect: 'none'
+            }} 
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
         </div>
       ))}
     </div>

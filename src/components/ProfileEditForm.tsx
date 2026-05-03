@@ -9,6 +9,7 @@ interface ProfileEditFormProps {
   initialInstagram?: string
   initialTimezone?: string
   initialLanguage?: string
+  initialMeetUrl?: string
   isReadOnly?: boolean
   isAvatarUploading?: boolean
   userRole?: string
@@ -17,7 +18,8 @@ interface ProfileEditFormProps {
     whatsapp: string,
     instagram?: string,
     timezone?: string,
-    language?: string
+    language?: string,
+    meetUrl?: string
   ) => Promise<{ success?: boolean; error?: string }>
 }
 
@@ -27,6 +29,7 @@ export default function ProfileEditForm({
   initialInstagram,
   initialTimezone,
   initialLanguage,
+  initialMeetUrl,
   isReadOnly = false,
   isAvatarUploading = false,
   userRole,
@@ -60,13 +63,14 @@ export default function ProfileEditForm({
     const instagram = (formData.get('instagram') as string) || undefined
     const timezone = (formData.get('timezone') as string) || undefined
     const language = (formData.get('language') as string) || undefined
+    const meetUrl = (formData.get('meetUrl') as string) || undefined
 
     setSuccess(false)
     setError(null)
 
     startTransition(async () => {
       try {
-        const res = await saveAction(fullName, whatsapp, instagram, timezone, language)
+        const res = await saveAction(fullName, whatsapp, instagram, timezone, language, meetUrl)
         if (res?.error) {
           setError(res.error)
         } else {
@@ -154,6 +158,24 @@ export default function ProfileEditForm({
 
       {initialLanguage !== undefined && (userRole === 'admin' || userRole === 'admin_master') && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            Link do Google Meet (Pessoal)
+          </label>
+          <input
+            name="meetUrl"
+            defaultValue={initialMeetUrl}
+            placeholder="https://meet.google.com/xxx-xxxx-xxx"
+            disabled={isPending || isReadOnly || isAvatarUploading}
+            style={fieldStyle}
+          />
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            Este link será usado em todas as suas aulas (fixas e remarcadas).
+          </div>
+        </div>
+      )}
+
+      {initialLanguage !== undefined && (userRole === 'admin' || userRole === 'admin_master') && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1.25rem' }}>
           <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
             Idioma Principal de Ensino
           </label>

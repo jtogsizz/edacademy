@@ -140,9 +140,10 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
         .carousel-container {
           position: relative;
           width: 100%;
-          perspective: 1000px;
-          padding: 1rem 0;
+          perspective: 1500px;
+          padding: 3rem 0;
           user-select: none;
+          overflow: visible;
         }
 
         .carousel-wrapper {
@@ -150,7 +151,7 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
           display: flex;
           justify-content: center;
           align-items: center;
-          height: 420px;
+          height: 450px;
           transform-style: preserve-3d;
           cursor: grab;
         }
@@ -161,55 +162,70 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
 
         .carousel-card {
           position: absolute;
-          width: 260px;
-          height: 380px;
+          width: 280px;
+          height: 400px;
           background: #fff;
-          border-radius: var(--radius-xl);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-          transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          border-radius: 24px;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+          transition: all 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
           cursor: pointer;
           overflow: hidden;
           opacity: 0;
           pointer-events: none;
           display: flex;
           flex-direction: column;
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          backface-visibility: hidden;
         }
 
-        /* 3D Positions - Subtle translate to fit column */
+        /* 3D Positions with better depth and blur */
         .carousel-card.active {
           opacity: 1;
           pointer-events: auto;
-          transform: translateX(0) scale(1) translateZ(0);
+          transform: translateX(0) scale(1.05) translateZ(100px);
           z-index: 10;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+          box-shadow: 0 30px 60px rgba(0,0,0,0.2);
+          filter: blur(0);
         }
 
         .carousel-card.prev {
-          opacity: 0.6;
+          opacity: 0.7;
           pointer-events: auto;
-          transform: translateX(-45%) scale(0.8) rotateY(15deg);
+          transform: translateX(-55%) scale(0.85) rotateY(25deg) translateZ(0);
           z-index: 5;
-          filter: blur(1px);
+          filter: blur(4px);
         }
 
         .carousel-card.next {
-          opacity: 0.6;
+          opacity: 0.7;
           pointer-events: auto;
-          transform: translateX(45%) scale(0.8) rotateY(-15deg);
+          transform: translateX(55%) scale(0.85) rotateY(-25deg) translateZ(0);
           z-index: 5;
-          filter: blur(1px);
+          filter: blur(4px);
         }
 
         .card-image-wrapper {
           position: relative;
           width: 100%;
-          height: 70%;
-          background: var(--border);
+          height: 75%;
+          background: #f3f4f6;
           pointer-events: none;
+          overflow: hidden;
+        }
+
+        .card-image-wrapper::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 40%;
+          background: linear-gradient(to top, rgba(255,255,255,1), transparent);
+          z-index: 1;
         }
 
         .card-info {
-          padding: 1.5rem;
+          padding: 1.25rem;
           text-align: center;
           background: #fff;
           flex: 1;
@@ -217,74 +233,76 @@ const ProfessorCarousel: React.FC<ProfessorCarouselProps> = ({ professors }) => 
           flex-direction: column;
           justify-content: center;
           align-items: center;
+          position: relative;
+          z-index: 2;
         }
 
         .card-info h3 {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: var(--text-main);
-          margin-bottom: 0.25rem;
+          font-size: 1.4rem;
+          font-weight: 800;
+          color: #1f2937;
+          margin-bottom: 0.2rem;
+          letter-spacing: -0.02em;
         }
 
         .card-info p {
-          font-size: 0.95rem;
+          font-size: 0.9rem;
           color: var(--primary);
-          font-weight: 600;
-          margin-bottom: 0.75rem;
+          font-weight: 700;
+          margin-bottom: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .carousel-controls {
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-top: 2rem;
+          margin-top: 1.5rem;
         }
 
         .carousel-dots {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.75rem;
         }
 
         .dot {
-          width: 8px;
-          height: 8px;
+          width: 10px;
+          height: 10px;
           border-radius: 50%;
-          background: var(--border);
+          background: #e5e7eb;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         .dot.active {
-          width: 24px;
-          border-radius: 4px;
+          width: 32px;
+          border-radius: 5px;
           background: var(--primary);
         }
 
         @media (max-width: 768px) {
           .carousel-wrapper {
-            height: 480px;
+            height: 400px;
           }
           .carousel-card {
-            width: 280px;
-            height: 420px;
+            width: 240px;
+            height: 360px;
           }
           .carousel-card.prev {
-            transform: translateX(-50%) scale(0.75) rotateY(10deg);
-            opacity: 0.3;
-            z-index: 5;
+            transform: translateX(-45%) scale(0.75) rotateY(20deg);
+            opacity: 0.4;
           }
           .carousel-card.next {
-            transform: translateX(50%) scale(0.75) rotateY(-10deg);
-            opacity: 0.3;
-            z-index: 5;
+            transform: translateX(45%) scale(0.75) rotateY(-20deg);
+            opacity: 0.4;
           }
-           .carousel-card.active {
-            transform: translateX(0) scale(1);
-            opacity: 1;
-            z-index: 10;
+          .carousel-card.active {
+            transform: translateX(0) scale(1) translateZ(50px);
           }
         }
       `}</style>
+
     </div>
   );
 };

@@ -90,17 +90,23 @@ export function getUnifiedStudentAgenda(
   // 2. Adicionar agendamentos manuais (extras/reposição) não consumidos
   for (const apt of oneOffAppointments) {
     if (!consumedIds.has(apt.id)) {
-      if (apt.status === 'scheduled') {
-        agenda.push({
-          ...apt,
-          is_recurring: false
-        })
-      }
+      agenda.push({
+        ...apt,
+        is_recurring: false
+      })
     }
   }
 
+  // 3. Deduplicar por ID (segurança contra dados inconsistentes no banco)
+  const seenIds = new Set<string>()
+  const deduped = agenda.filter(a => {
+    if (seenIds.has(a.id)) return false
+    seenIds.add(a.id)
+    return true
+  })
+
   // Ordenar cronologicamente
-  return agenda.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+  return deduped.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 }
 
 /**
@@ -173,18 +179,22 @@ export function getUnifiedTeacherAgenda(
   // 2. Adicionar agendamentos manuais (extras/reposição) não consumidos
   for (const apt of oneOffAppointments) {
     if (!consumedIds.has(apt.id)) {
-      // Apenas adicionamos se for um agendamento extra ativo
-      // Isso elimina os "cancelamentos fantasmas" que não batem com nenhuma regra atual
-      if (apt.status === 'scheduled') {
-        agenda.push({
-          ...apt,
-          is_recurring: false
-        })
-      }
+      agenda.push({
+        ...apt,
+        is_recurring: false
+      })
     }
   }
 
-  return agenda.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+  // 3. Deduplicar por ID (segurança contra dados inconsistentes no banco)
+  const seenIdsTeacher = new Set<string>()
+  const dedupedTeacher = agenda.filter(a => {
+    if (seenIdsTeacher.has(a.id)) return false
+    seenIdsTeacher.add(a.id)
+    return true
+  })
+
+  return dedupedTeacher.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 }
 
 /**

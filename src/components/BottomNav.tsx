@@ -8,7 +8,7 @@ import styles from "./BottomNav.module.css";
 export default function BottomNav({ role }: { role?: string }) {
   const pathname = usePathname();
   
-  const isProfileAdmin = role === 'admin' || role === 'admin_master' || pathname?.startsWith('/admin');
+  const isProfileAdmin = role === 'admin' || role === 'admin_master' || role === 'suporte' || role === 'dev' || pathname?.startsWith('/admin');
 
   const navItems = isProfileAdmin
     ? [

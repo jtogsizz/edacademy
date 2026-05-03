@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { getAppUrl } from '@/utils/url'
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  const origin = getAppUrl()
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/dashboard'
 
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}${next}`)
       } else {
         // Redireciona para conta inativa
-        return NextResponse.redirect(`${origin}/inactive-account`)
+        return NextResponse.redirect(`${origin}/meus-eventos`)
       }
     }
   }

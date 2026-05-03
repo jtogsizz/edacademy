@@ -23,11 +23,11 @@ export default async function AdminLayout({
 
   if (profile && profile.is_active === false) {
     // Redireciona mesmo o admin se estiver inativo, como garantia
-    redirect('/inactive-account')
+    redirect('/meus-eventos')
   }
 
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') {
-    // Se não for admin, chuta de volta pro dashboard do aluno
+  if (profile?.role !== 'admin' && profile?.role !== 'admin_master' && profile?.role !== 'suporte' && profile?.role !== 'dev') {
+    // Se não for nenhum tipo de admin, chuta de volta pro dashboard do aluno
     redirect('/dashboard')
   }
 

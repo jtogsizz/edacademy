@@ -21,10 +21,10 @@ export default function Logo({
       display: 'flex', 
       flexDirection: isVertical ? 'column' : 'row',
       alignItems: 'center', 
-      justifyContent: 'center',
+      justifyContent: isVertical ? 'center' : 'flex-start',
       gap: isVertical ? '8px' : '12px', 
       userSelect: 'none',
-      textAlign: 'center'
+      textAlign: isVertical ? 'center' : 'left'
     }}>
       <div style={{
         display: 'flex',

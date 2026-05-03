@@ -11,11 +11,15 @@ import type { Slot } from './ScheduleEngine'
 export default function BookingCalendar({ 
   groupedDates, 
   teacherId,
-  userTimezone
+  userTimezone,
+  replacementCredits = 0,
+  expiryDateISO
 }: { 
   groupedDates: Record<string, Slot[]>, 
   teacherId: string,
-  userTimezone: string
+  userTimezone: string,
+  replacementCredits?: number,
+  expiryDateISO?: string
 }) {
   const searchParams = useSearchParams()
   const rescheduleId = searchParams.get('reschedule_id')
@@ -72,7 +76,8 @@ export default function BookingCalendar({
             const dateObj = parseISO(dateStr)
             const isSelected = selectedDateStr === dateStr
             const slots = groupedDates[dateStr]
-            const allOccupied = slots.length > 0 && slots.every(s => s.status !== 'free')
+            const allExpired = slots.length > 0 && slots.every(s => s.status === 'after_expiry')
+            const allOccupied = slots.length > 0 && !allExpired && slots.every(s => s.status !== 'free')
             const emptyDay = slots.length === 0
 
             return (
@@ -90,7 +95,7 @@ export default function BookingCalendar({
                   borderRadius: 'var(--radius-md)',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  opacity: emptyDay ? 0.5 : 1
+                  opacity: emptyDay || allExpired ? 0.5 : 1
                 }}
               >
                 <div>
@@ -101,6 +106,9 @@ export default function BookingCalendar({
                     {formatInTimeZone(dateObj, userTimezone, "EEEE", { locale: ptBR })}
                   </div>
                 </div>
+                {allExpired && !emptyDay && (
+                  <span style={{ fontSize: '0.75rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px dashed var(--border)', padding: '0.2rem 0.5rem', borderRadius: '10px' }}>Plano Vencido</span>
+                )}
                 {allOccupied && !emptyDay && (
                   <span style={{ fontSize: '0.75rem', backgroundColor: 'var(--error)', color: '#fff', padding: '0.2rem 0.5rem', borderRadius: '10px' }}>Lotado</span>
                 )}
@@ -126,19 +134,28 @@ export default function BookingCalendar({
                   <strong>Modo Reposição:</strong> Escolha um novo horário para sua aula.
                 </div>
               )}
+              {!rescheduleId && (
+                <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: replacementCredits > 0 ? 'var(--text-muted)' : '#CA8A04' }}>
+                  <span style={{ fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '99px', backgroundColor: replacementCredits > 0 ? 'rgba(52,211,153,0.1)' : 'rgba(234,179,8,0.1)', color: replacementCredits > 0 ? '#059669' : '#CA8A04', border: `1px solid ${replacementCredits > 0 ? 'rgba(52,211,153,0.3)' : 'rgba(234,179,8,0.3)'}`, fontSize: '0.75rem' }}>
+                    {replacementCredits} crédito{replacementCredits !== 1 ? 's' : ''}
+                  </span>
+                  {replacementCredits === 0 ? 'Nenhum crédito disponível para aula extra' : 'disponível para aula extra'}
+                </div>
+              )}
             </div>
 
             {error && <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--error)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>{error}</div>}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
-              {selectedSlots.map((slot, idx) => {
+              {selectedSlots.map((slot) => {
                 const prepStart = formatInTimeZone(parseISO(slot.prepStartTimeISO), userTimezone, "HH:mm", { locale: ptBR })
                 const classEnd = formatInTimeZone(parseISO(slot.endTimeISO), userTimezone, "HH:mm", { locale: ptBR })
 
                 if (slot.status === 'free') {
-                  return (
+                  const hasCredits = rescheduleId || replacementCredits > 0
+                  return hasCredits ? (
                     <button 
-                      key={idx} 
+                      key={slot.startTimeISO} 
                       onClick={() => handleAction(slot.startTimeISO, slot.endTimeISO)}
                       disabled={loading}
                       className="btn-outline hover-fx"
@@ -149,12 +166,19 @@ export default function BookingCalendar({
                       </div>
                       <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--primary)' }}>Agendar Aula</span>
                     </button>
+                  ) : (
+                    <div key={slot.startTimeISO} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'rgba(234,179,8,0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(234,179,8,0.3)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'not-allowed', opacity: 0.7 }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '0.2rem' }}>
+                        {prepStart} — {classEnd}
+                      </div>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#CA8A04' }}>Sem crédito</span>
+                    </div>
                   )
                 }
 
                 if (slot.status === 'my_class') {
                   return (
-                    <div key={idx} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--primary)', color: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                    <div key={slot.startTimeISO} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--primary)', color: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                       <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.2rem' }}>
                         {prepStart} — {classEnd}
                       </div>
@@ -163,12 +187,34 @@ export default function BookingCalendar({
                   )
                 }
 
+                if (slot.status === 'after_expiry') {
+                  return (
+                    <div key={slot.startTimeISO} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', opacity: 0.55, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.1rem', textDecoration: 'line-through', marginBottom: '0.2rem' }}>
+                        {prepStart} — {classEnd}
+                      </div>
+                      <span style={{ display: 'block', fontSize: '0.72rem' }}>Após vencimento</span>
+                    </div>
+                  )
+                }
+
+                if (slot.status === 'teacher_absent') {
+                  return (
+                    <div key={slot.startTimeISO} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)', color: 'var(--error)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.3)', opacity: 0.8, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'not-allowed' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.2rem', textDecoration: 'line-through' }}>
+                        {prepStart} — {classEnd}
+                      </div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>{slot.absenceReason || 'Ausente'}</span>
+                    </div>
+                  )
+                }
+
                 return (
-                  <div key={idx} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', opacity: 0.6, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                  <div key={slot.startTimeISO} style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', opacity: 0.6, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                     <div style={{ fontWeight: 700, fontSize: '1.1rem', textDecoration: 'line-through', marginBottom: '0.2rem' }}>
                       {prepStart} — {classEnd}
                     </div>
-                    <span style={{ display: 'block', fontSize: '0.75rem' }}>Indisponível</span>
+                    <span style={{ display: 'block', fontSize: '0.75rem' }}>Ocupado</span>
                   </div>
                 )
               })}

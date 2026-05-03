@@ -66,16 +66,63 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
+DECLARE
+    v_event_id UUID;
+    v_max_participants INTEGER;
+    v_current_participants INTEGER;
+    v_status TEXT;
+    v_end_time TIMESTAMPTZ;
 BEGIN
-  -- Insert into profiles
-  INSERT INTO public.profiles (id, full_name, role)
-  VALUES (new.id, new.raw_user_meta_data->>'full_name', 'student');
+    -- 1. Criação do Perfil (Novo usuário nasce inativo)
+    -- Usamos COALESCE para garantir que campos obrigatórios nunca sejam NULL
+    INSERT INTO public.profiles (id, full_name, role, whatsapp_number, timezone)
+    VALUES (
+        new.id, 
+        COALESCE(new.raw_user_meta_data->>'full_name', 'Estudante'), 
+        'student',
+        COALESCE(new.raw_user_meta_data->>'whatsapp_number', ''),
+        COALESCE(new.raw_user_meta_data->>'timezone', 'America/Sao_Paulo')
+    );
 
-  -- Create an inactive subscription for the new student
-  INSERT INTO public.subscriptions (student_id, status)
-  VALUES (new.id, 'inactive');
+    -- 2. Criação da Assinatura Inativa
+    INSERT INTO public.subscriptions (student_id, status)
+    VALUES (new.id, 'inactive');
 
-  RETURN NEW;
+    -- 3. Fluxo de Lead: Cast Seguro do event_id
+    BEGIN
+        v_event_id := NULLIF(new.raw_user_meta_data->>'event_id', '')::UUID;
+    EXCEPTION WHEN others THEN
+        v_event_id := NULL; -- Se o UUID for inválido, apenas ignoramos a inscrição
+    END;
+
+    -- 4. Validação e Inscrição Atômica
+    IF v_event_id IS NOT NULL THEN
+        -- SELECT FOR UPDATE para garantir atomicidade das vagas
+        SELECT max_participants, status, end_time 
+        INTO v_max_participants, v_status, v_end_time
+        FROM public.events
+        WHERE id = v_event_id
+        FOR UPDATE;
+
+        -- Só prossegue se o evento existir, estiver agendado e dentro do prazo
+        IF FOUND AND v_status = 'scheduled' AND v_end_time > now() THEN
+            
+            -- Conta participantes sob o lock do evento
+            SELECT COUNT(*) INTO v_current_participants
+            FROM public.event_participants
+            WHERE event_id = v_event_id;
+
+            -- Inscrição se houver vaga (respeitando concorrência)
+            IF v_current_participants < v_max_participants THEN
+                INSERT INTO public.event_participants (event_id, student_id)
+                VALUES (v_event_id, new.id)
+                ON CONFLICT DO NOTHING;
+            END IF;
+            
+        END IF;
+    END IF;
+
+    RETURN NEW;
 END;
 $$;
 

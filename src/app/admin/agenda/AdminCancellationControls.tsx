@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from 'react'
-import { cancelAppointmentByTeacher, cancelDayByTeacher, cancelRecurringClassInstance } from '../../dashboard/schedule/actions'
+import { useState, useEffect } from 'react'
+import { cancelAppointmentByTeacher, cancelDayByTeacher, cancelRecurringClassInstance, getTeacherActiveDays } from '../../dashboard/schedule/actions'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -15,12 +15,30 @@ export default function AdminCancellationControls({ appointmentId, dateStr, type
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState(dateStr || '')
   const router = useRouter()
+  const [activeDates, setActiveDates] = useState<string[]>([])
 
-  const reasons = ['Feriado', 'Atestado Médico', 'Evento na Unidade', 'Problemas Técnicos', 'Imprevisto Pessoal', 'Outro']
+  useEffect(() => {
+    if (showModal && type === 'day') {
+      getTeacherActiveDays().then(res => {
+        if (res?.data) {
+          setActiveDates(res.data)
+          if (res.data.length > 0 && !selectedDate) {
+            setSelectedDate(res.data[0])
+          }
+        }
+      })
+    }
+  }, [showModal, type])
+
+  const dayReasons = ['Feriado', 'Atestado Médico', 'Imprevisto Pessoal', 'Problemas Técnicos', 'Outro']
+  const singleReasons = ['Feriado', 'Atestado Médico', 'Problemas Técnicos', 'Imprevisto Pessoal', 'Aluno não compareceu', 'Outro']
+  const reasons = type === 'day' ? dayReasons : singleReasons
 
   async function handleConfirm() {
     if (!reason) return setError('Por favor, informe o motivo.')
+    if (type === 'day' && !selectedDate) return setError('Por favor, selecione o dia.')
     setLoading(true)
     setError(null)
 
@@ -32,8 +50,8 @@ export default function AdminCancellationControls({ appointmentId, dateStr, type
         } else {
           res = await cancelAppointmentByTeacher(appointmentId, reason)
         }
-      } else if (type === 'day' && dateStr) {
-        res = await cancelDayByTeacher(dateStr, reason)
+      } else if (type === 'day') {
+        res = await cancelDayByTeacher(selectedDate, reason)
       }
 
       if (res?.error) {
@@ -62,7 +80,7 @@ export default function AdminCancellationControls({ appointmentId, dateStr, type
           cursor: 'pointer'
         }}
       >
-        {type === 'day' ? 'Desmarcar Todo o Dia' : 'Cancelar Aula'}
+        {type === 'day' ? 'Desmarcar Dia Inteiro' : 'Cancelar Aula'}
       </button>
 
       {showModal && (
@@ -72,8 +90,37 @@ export default function AdminCancellationControls({ appointmentId, dateStr, type
               {type === 'day' ? 'Cancelar Dia Inteiro' : 'Cancelar Agendamento'}
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Esta ação enviará 1 crédito de reposição automaticamente para {type === 'day' ? 'todos os alunos afetados' : 'o aluno'}.
+              {reason === 'Aluno não compareceu'
+                ? 'Esta ação registrará a ausência. Nenhum crédito será gerado ao aluno.'
+                : `Esta ação enviará 1 crédito de reposição automaticamente para ${type === 'day' ? 'todos os alunos afetados' : 'o aluno'}.`
+              }
             </p>
+            {reason === 'Aluno não compareceu' && (
+              <div style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-md)', padding: '0.65rem 1rem', marginBottom: '1.25rem', fontSize: '0.82rem', color: 'var(--error)', fontWeight: 500 }}>
+                Nenhum crédito de reposição será adicionado ao aluno.
+              </div>
+            )}
+
+            {type === 'day' && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600 }}>Dia a Cancelar</label>
+                <select
+                  value={selectedDate}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+                >
+                  <option value="" disabled>Selecione um dia com aulas...</option>
+                  {activeDates.map(d => (
+                    <option key={d} value={d}>
+                      {new Date(d + 'T12:00:00Z').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                    </option>
+                  ))}
+                </select>
+                {activeDates.length === 0 && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Buscando dias ativos da agenda...</div>
+                )}
+              </div>
+            )}
 
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600 }}>Motivo do Cancelamento</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>

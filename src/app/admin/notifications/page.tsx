@@ -10,17 +10,17 @@ import { markNotificationAsRead } from '@/app/dashboard/notifications/actions'
 export const metadata = { title: 'Notificações' }
 
 const TYPE_ICONS: Record<string, string> = {
-  class_cancelled:   '🚫',
+  class_cancelled: '🚫',
   class_rescheduled: '🔄',
-  payment_due:       '💰',
-  system:            '🔔',
+  payment_due: '💰',
+  system: '🔔',
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  class_cancelled:   'Aula cancelada',
+  class_cancelled: 'Aula cancelada',
   class_rescheduled: 'Remarcação',
-  payment_due:       'Pagamento',
-  system:            'Sistema',
+  payment_due: 'Pagamento',
+  system: 'Sistema',
 }
 
 export default async function AdminNotificationsPage() {
@@ -30,7 +30,7 @@ export default async function AdminNotificationsPage() {
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
+  if (profile?.role !== 'admin' && profile?.role !== 'admin_master' && profile?.role !== 'suporte' && profile?.role !== 'dev') redirect('/dashboard')
 
   const isAdminMaster = profile?.role === 'admin_master'
 

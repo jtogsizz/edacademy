@@ -11,6 +11,7 @@ interface InitialProfile {
   avatar_url: string | null
   timezone?: string | null
   language?: string | null
+  meet_url?: string | null
 }
 
 interface Props {
@@ -22,7 +23,8 @@ interface Props {
     whatsapp: string,
     instagram?: string,
     timezone?: string,
-    language?: string
+    language?: string,
+    meetUrl?: string
   ) => Promise<{ success?: boolean; error?: string }>
   userRole?: string
 }

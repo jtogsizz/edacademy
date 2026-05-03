@@ -6,6 +6,9 @@ RETURNS BOOLEAN AS $$
 DECLARE
   rows_updated INTEGER;
 BEGIN
+  -- Bypass explícito da trigger de proteção
+  PERFORM set_config('edacademy.allow_profile_system_update', 'true', true);
+
   -- Tenta decrementar apenas se houver saldo > 0
   UPDATE public.profiles
   SET 

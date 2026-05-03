@@ -6,8 +6,11 @@ import { revalidatePath } from 'next/cache'
 
 
 
-export async function changeUserRole(targetUserId: string, newRole: 'student' | 'admin') {
-  console.log(`[changeUserRole] Reversão: Chamado para usuário ${targetUserId} com novo cargo: ${newRole}`)
+export async function changeUserRole(
+  targetUserId: string,
+  newRole: 'student' | 'admin' | 'admin_master' | 'suporte' | 'dev'
+) {
+  console.log(`[changeUserRole] Chamado para usuário ${targetUserId} com novo cargo: ${newRole}`)
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,25 +20,36 @@ export async function changeUserRole(targetUserId: string, newRole: 'student' | 
   }
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  console.log(`[changeUserRole] Role do executor (${user.id}): ${profile?.role}`)
+  const executorRole = profile?.role
+  console.log(`[changeUserRole] Executor (${user.id}): ${executorRole}`)
 
-  // Somente ADMIN MASTER pode promover ou rebaixar membros
-  if (profile?.role !== 'admin_master') {
-    console.warn('[changeUserRole] Tentativa de mudança de cargo por usuário não Master negada.')
+  // Somente admin_master ou dev podem alterar cargos
+  if (executorRole !== 'admin_master' && executorRole !== 'dev') {
+    console.warn('[changeUserRole] Acesso negado: executor não é master nem dev.')
     return
   }
 
-  // Volta para o modelo estável: Update direto via Supabase Client
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      role: newRole,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', targetUserId)
+  // Somente dev pode promover para dev ou admin_master
+  if ((newRole === 'dev' || newRole === 'admin_master') && executorRole !== 'dev') {
+    console.warn('[changeUserRole] Acesso negado: apenas dev pode promover para dev/admin_master.')
+    return
+  }
+
+  // Proteger contas dev: somente outro dev pode alterar
+  const { data: target } = await supabase.from('profiles').select('role').eq('id', targetUserId).single()
+  if (target?.role === 'dev' && executorRole !== 'dev') {
+    console.warn('[changeUserRole] Acesso negado: apenas dev pode alterar outro dev.')
+    return
+  }
+
+  // Utiliza a RPC para garantir o promotion_bypass e evitar o bloqueio da trigger protect_profile_fields
+  const { error } = await supabase.rpc('promote_user_role', {
+    target_user_id: targetUserId,
+    new_role: newRole
+  })
 
   if (error) {
-    console.error('[Action: changeUserRole] Erro na gravação direta:', error)
+    console.error('[Action: changeUserRole] Erro:', error)
     throw new Error(error.message)
   }
 
@@ -56,7 +70,7 @@ export async function updateSubscriptionManual(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Não autenticado')
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin_master') throw new Error('Acesso restrito')
+  if (profile?.role !== 'admin_master' && profile?.role !== 'dev') throw new Error('Acesso restrito')
 
   // 1. Buscar estado atual para o log
   const { data: currentSub } = await supabase
@@ -135,7 +149,7 @@ export async function toggleSubscriptionStatus(studentId: string, currentStatus:
   console.log(`[toggleSubscriptionStatus] Executado por: ${user.id} (Role: ${profile?.role})`)
 
   // Somente ADMIN ou ADMIN MASTER podem alternar status
-  const isAuthorized = profile?.role === 'admin' || profile?.role === 'admin_master'
+  const isAuthorized = profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev'
   if (!isAuthorized) {
     console.warn('[toggleSubscriptionStatus] Acesso negado')
     return
@@ -212,7 +226,7 @@ export async function setTeacherLanguage(teacherId: string, language: string) {
   if (!user) return
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin_master') return
+  if (profile?.role !== 'admin_master' && profile?.role !== 'dev') return
 
   await supabase.from('profiles').update({ language: language || null }).eq('id', teacherId)
   revalidatePath('/admin/profile')
@@ -228,7 +242,7 @@ export async function setStudentLanguage(studentId: string, language: string) {
   if (!user) return
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'admin_master'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev'
   if (!isAdmin) return
 
   await supabase.from('profiles').update({ student_language: language || null }).eq('id', studentId)
@@ -263,7 +277,11 @@ export async function deleteUserAccount(targetUserId: string) {
   if (!user) return { error: 'Não autenticado' }
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin_master') return { error: 'Acesso restrito' }
+  if (profile?.role !== 'admin_master' && profile?.role !== 'dev') return { error: 'Acesso restrito' }
+
+  // Proteger contas dev de exclusão por não-dev
+  const { data: targetProf } = await supabase.from('profiles').select('role').eq('id', targetUserId).single()
+  if (targetProf?.role === 'dev' && profile?.role !== 'dev') return { error: 'Apenas dev pode excluir conta de outro dev.' }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!serviceKey) return { error: 'Chave de serviço ausente no ambiente.' }
@@ -327,7 +345,7 @@ export async function updatePixConfig(data: {
   if (!user) return { error: 'Não autenticado' }
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin_master') return { error: 'Acesso restrito' }
+  if (profile?.role !== 'admin_master' && profile?.role !== 'dev') return { error: 'Acesso restrito' }
 
   // Busca o id da row de settings (pode ser que exista apenas uma)
   const { data: existing } = await supabase.from('settings').select('id').maybeSingle()

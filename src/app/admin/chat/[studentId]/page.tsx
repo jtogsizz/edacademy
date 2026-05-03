@@ -12,7 +12,7 @@ export default async function AdminStudentChatPage({ params }: { params: Promise
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
+  if (profile?.role !== 'admin' && profile?.role !== 'admin_master' && profile?.role !== 'suporte' && profile?.role !== 'dev') redirect('/dashboard')
 
   // Pega o coitadinho do aluno
   const { data: student } = await supabase.from('profiles').select('*').eq('id', studentId).single()

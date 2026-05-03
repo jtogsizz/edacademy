@@ -17,7 +17,7 @@ export default async function OnboardingPage() {
     if (profile.is_active) {
        redirect('/dashboard')
     } else {
-       redirect('/inactive-account')
+       redirect('/meus-eventos')
     }
   }
 

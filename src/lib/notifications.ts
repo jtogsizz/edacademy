@@ -10,12 +10,14 @@ export type NotificationType =
   | 'class_rescheduled'
   | 'payment_due'
   | 'system'
+  | 'system_alert'
 
 export const NOTIF_ICONS: Record<NotificationType | string, string> = {
   class_cancelled:  '🚫',
   class_rescheduled: '🔄',
   payment_due:      '💰',
   system:           '🔔',
+  system_alert:     '🚨',
 }
 
 function getServiceClient() {

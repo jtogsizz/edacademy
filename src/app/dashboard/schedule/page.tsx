@@ -19,12 +19,14 @@ export default async function SchedulePage({
   // Buscar idioma do aluno (necessário para filtrar professores)
   const { data: studentProfile } = await supabase
     .from('profiles')
-    .select('student_language, timezone')
+    .select('student_language, timezone, replacement_credits')
     .eq('id', user.id)
     .single()
 
   const studentLanguage = studentProfile?.student_language ?? null
   const userTimezone = studentProfile?.timezone || 'America/Sao_Paulo'
+  const replacementCredits = studentProfile?.replacement_credits ?? 0
+  const expiryDate = subscription?.end_date ? new Date(subscription.end_date) : undefined
 
   // Resolvemos searchParams assíncronos (Next 15)
   const resolvedParams = await searchParams
@@ -89,7 +91,8 @@ export default async function SchedulePage({
   }
 
   const { data: availability } = await supabase.from('teacher_availability').select('*').eq('teacher_id', teacherId)
-  const { data: recurring } = await supabase.from('recurring_classes').select('*').eq('teacher_id', teacherId)
+  const { data: recurring } = await supabase.rpc('get_teacher_recurring_status', { p_teacher_id: teacherId })
+  const { data: absences } = await supabase.rpc('get_teacher_absences_public', { p_teacher_id: teacherId })
   
   const today = new Date()
   today.setHours(0,0,0,0)
@@ -99,13 +102,16 @@ export default async function SchedulePage({
     .select('*')
     .eq('teacher_id', teacherId)
     .gte('start_time', today.toISOString())
+    .in('status', ['scheduled', 'cancelled'])
 
   const groupedDates = generateScheduleGrid(
     availability || [],
     recurring || [],
     appointments || [],
     user.id,
-    userTimezone
+    userTimezone,
+    expiryDate,
+    absences || []
   )
 
   return (
@@ -118,7 +124,13 @@ export default async function SchedulePage({
         <p style={{ color: 'var(--text-muted)' }}>Escolha um dia livre para suas aulas.</p>
       </header>
 
-      <BookingCalendar groupedDates={groupedDates} teacherId={teacherId} userTimezone={userTimezone} />
+      <BookingCalendar
+        groupedDates={groupedDates}
+        teacherId={teacherId}
+        userTimezone={userTimezone}
+        replacementCredits={replacementCredits}
+        expiryDateISO={subscription?.end_date ?? undefined}
+      />
     </div>
   )
 }

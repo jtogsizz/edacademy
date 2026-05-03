@@ -6,6 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
 import RecurringClassForm from './RecurringClassForm'
+import RemoveClassButton from './RemoveClassButton'
 import PixPaymentModal from '@/components/PixPaymentModal'
 import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
@@ -104,7 +105,8 @@ export default async function StudentProfilePage() {
               whatsapp_number: profile?.whatsapp_number || '',
               instagram_handle: profile?.instagram_handle || '',
               avatar_url: profile?.avatar_url || null,
-              timezone: profile?.timezone || null
+              timezone: profile?.timezone || null,
+              meet_url: profile?.meet_url || null
             }}
             isReadOnly={false}
             userRole={profile?.role}
@@ -261,13 +263,7 @@ export default async function StudentProfilePage() {
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Prof. {r.teacher?.full_name}</div>
                       </div>
-                    <form action={async () => {
-                      'use server'
-                      const { removeRecurringClass } = await import('@/app/dashboard/schedule/actions')
-                      await removeRecurringClass(r.id)
-                    }}>
-                      <button type="submit" style={{ background: 'none', border: 'none', color: 'var(--error)', fontSize: '0.8rem', cursor: 'pointer', padding: '0.5rem' }}>Remover</button>
-                    </form>
+                    <RemoveClassButton classId={r.id} />
                   </div>
                 )})
               ) : (
@@ -295,7 +291,6 @@ export default async function StudentProfilePage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>📅</span>
           <div>
             <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1rem' }}>Minhas Aulas</div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>

@@ -63,13 +63,13 @@ export default function BookingForm({
                 {format(dateObj, "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </h4>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                {slots.map((s, idx) => {
+                {slots.map((s) => {
                   const sObj = parseISO(s.startTimeISO)
                   const timeLabel = format(sObj, "HH:mm", { locale: ptBR })
 
                   return (
                     <button 
-                      key={idx} 
+                      key={s.startTimeISO} 
                       onClick={() => handleBook(s.startTimeISO, s.endTimeISO)}
                       disabled={loading}
                       className="btn-outline"

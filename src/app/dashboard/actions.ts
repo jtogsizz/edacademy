@@ -2,28 +2,113 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { checkRateLimit, RATE_LIMIT_MESSAGES } from '@/utils/rate-limit'
 
 /**
  * Cria um novo post no feed.
  * Apenas admins e admin_master podem postar.
  */
-export async function createPost(content: string, imageUrl: string | null) {
+export async function createPost(content: string, imageUrl: string | null, eventData?: any) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { error: 'Não autorizado' }
+
+  // Rate limit: 10 posts por minuto por usuário
+  const { limited } = await checkRateLimit('post', user.id)
+  if (limited) return { error: RATE_LIMIT_MESSAGES.post }
+  
+  // Verificar permissão
+  const STAFF_ROLES = ['admin', 'admin_master', 'suporte', 'dev']
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  
+  if (!profile || !STAFF_ROLES.includes(profile.role)) {
+    return { error: 'Apenas professores e staff podem publicar no feed.' }
+  }
+  
+  let eventId = null
+  
+  // Se houver dados de evento, cria o evento primeiro
+  if (eventData) {
+    const { title, teacher_id, start_time, end_time, max_participants, meet_url, is_public } = eventData
+    
+    // Validação básica de URL
+    if (meet_url && !meet_url.startsWith('https://')) {
+      return { error: 'O link da reunião deve começar com https://' }
+    }
+
+    const { data: ev, error: evError } = await supabase.from('events').insert({
+      title,
+      teacher_id,
+      start_time,
+      end_time,
+      max_participants,
+      is_public: Boolean(is_public),
+      meet_url: meet_url || null,
+      created_by: user.id
+    }).select('id').single()
+    
+    if (evError) return { error: evError.message }
+    eventId = ev.id
+  }
+
+  const { error } = await supabase.from('posts').insert({
+    user_id: user.id,
+    content,
+    image_url: imageUrl,
+    event_id: eventId
+  })
+  
+  if (error) return { error: error.message }
+  
+  revalidatePath('/dashboard')
+  revalidatePath('/admin')
+  revalidatePath('/')
+  return { success: true }
+}
+
+/**
+ * Atualiza o conteúdo de um post no feed.
+ * Apenas o autor do post pode editá-lo.
+ */
+export async function updatePost(postId: string, content: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) return { error: 'Não autorizado' }
   
-  // Verificar permissão
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') {
-    return { error: 'Apenas professores podem publicar no feed.' }
+  const { data: post } = await supabase.from('posts').select('user_id').eq('id', postId).single()
+  if (!post || post.user_id !== user.id) {
+    return { error: 'Você não tem permissão para editar este post.' }
   }
   
-  const { error } = await supabase.from('posts').insert({
-    user_id: user.id,
+  const { error } = await supabase.from('posts').update({ 
     content,
-    image_url: imageUrl
-  })
+  }).eq('id', postId)
+  
+  if (error) return { error: error.message }
+  
+  revalidatePath('/dashboard')
+  revalidatePath('/admin')
+  return { success: true }
+}
+
+/**
+ * Exclui um post do feed.
+ * Apenas o autor do post pode excluí-lo.
+ */
+export async function deletePost(postId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { error: 'Não autorizado' }
+  
+  const { data: post } = await supabase.from('posts').select('user_id').eq('id', postId).single()
+  if (!post || post.user_id !== user.id) {
+    return { error: 'Você não tem permissão para excluir este post.' }
+  }
+  
+  const { error } = await supabase.from('posts').delete().eq('id', postId)
   
   if (error) return { error: error.message }
   
@@ -61,7 +146,7 @@ export async function updateProfileAvatar(avatarUrl: string) {
  * Alunos: Apenas full_name, whatsapp_number e timezone.
  * Admins: IDK, podem editar instagram também.
  */
-export async function updateProfile(fullName: string, whatsapp: string, instagram?: string, timezone?: string, language?: string) {
+export async function updateProfile(fullName: string, whatsapp: string, instagram?: string, timezone?: string, language?: string, meetUrl?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado' }
@@ -81,6 +166,12 @@ export async function updateProfile(fullName: string, whatsapp: string, instagra
   if (profile?.role === 'admin' || profile?.role === 'admin_master') {
     updatePayload.instagram_handle = instagram || null
     updatePayload.language = language || null
+    
+    // Validação de URL do Meet
+    if (meetUrl && !meetUrl.startsWith('https://')) {
+      return { error: 'O link do Google Meet deve começar com https://' }
+    }
+    updatePayload.meet_url = meetUrl || null
   }
 
   const { error } = await supabase
@@ -94,5 +185,57 @@ export async function updateProfile(fullName: string, whatsapp: string, instagra
   revalidatePath('/admin/profile')
   return { success: true }
 }
+/**
+ * Alterna a curtida em um post.
+ */
+export async function toggleLike(postId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado' }
 
+  // 1. Verificar se já curtiu
+  const { data: existing } = await supabase
+    .from('post_likes')
+    .select('id')
+    .eq('post_id', postId)
+    .eq('user_id', user.id)
+    .maybeSingle()
 
+  if (existing) {
+    // Descurtir
+    const { error } = await supabase.from('post_likes').delete().eq('id', existing.id)
+    if (error) return { error: error.message }
+  } else {
+    // Curtir
+    const { error } = await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+/**
+ * Adiciona um comentário a um post.
+ */
+export async function addComment(postId: string, content: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado' }
+  if (!content.trim()) return { error: 'Conteúdo vazio' }
+
+  // Rate limit: 20 comentários por minuto por usuário
+  const { limited } = await checkRateLimit('comment', user.id)
+  if (limited) return { error: RATE_LIMIT_MESSAGES.comment }
+
+  const { error } = await supabase.from('post_comments').insert({
+    post_id: postId,
+    user_id: user.id,
+    content: content.trim()
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/dashboard')
+  return { success: true }
+}

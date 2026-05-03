@@ -57,7 +57,6 @@ export default function PixPaymentModal({ pix }: { pix: PixData }) {
           justifyContent: 'center',
         }}
       >
-        <span style={{ fontSize: '1.1rem' }}>💸</span>
         Pagar Mensalidade (PIX)
       </button>
 
@@ -98,7 +97,6 @@ export default function PixPaymentModal({ pix }: { pix: PixData }) {
 
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>💸</div>
               <h3 style={{ fontSize: '1.3rem', marginBottom: '0.25rem' }}>Pagar com PIX</h3>
               {pix.pix_beneficiary_name && (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Beneficiário: <strong>{pix.pix_beneficiary_name}</strong></p>

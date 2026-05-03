@@ -49,7 +49,7 @@ export default function ToggleSubscriptionButton({ studentId, currentStatus, isA
           textAlign: 'right',
           lineHeight: 1.3
         }}>
-          ⚠ {error}
+          Aviso: {error}
         </span>
       )}
     </div>

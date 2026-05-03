@@ -81,8 +81,8 @@ export default function SubscriptionManualManager({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Status de Acesso</label>
             <select value={status} onChange={(e) => setStatus(e.target.value as any)} style={{ width: '100%', padding: '0.75rem' }}>
-              <option value="active">✅ Ativo (Acesso Liberado)</option>
-              <option value="inactive">❌ Inativo (Bloqueado)</option>
+              <option value="active">Ativo (Acesso Liberado)</option>
+              <option value="inactive">Inativo (Bloqueado)</option>
             </select>
           </div>
 

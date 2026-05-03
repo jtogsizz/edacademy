@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import { getUnifiedStudentAgenda } from '@/utils/agendaUtils'
+import MeetLinkButton from '@/components/MeetLinkButton'
 import { unstable_noStore as noStore } from 'next/cache'
 import { cookies } from 'next/headers'
 
@@ -18,26 +19,28 @@ export default async function MinhasAulasPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('role, timezone').eq('id', user.id).single()
-  if (profile?.role === 'admin' || profile?.role === 'admin_master') redirect('/admin/agenda')
+  const { data: profile } = await supabase.from('profiles').select('role, timezone, replacement_credits').eq('id', user.id).single()
+  if (profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev') redirect('/admin/agenda')
 
   const { data: subscription } = await supabase.from('subscriptions').select('status').eq('student_id', user.id).maybeSingle()
   const isActive = subscription?.status === 'active'
 
   const userTz = profile?.timezone || clientTz || 'America/Sao_Paulo'
   const isFallback = !profile?.timezone && !clientTz
+  const replacementCredits = profile?.replacement_credits ?? 0
 
   // Buscar aulas recorrentes e agendamentos
   const { data: recurring } = await supabase
     .from('recurring_classes')
-    .select('*, teacher:profiles!recurring_classes_teacher_id_fkey(id, full_name, whatsapp_number)')
+    .select('*, teacher:profiles!recurring_classes_teacher_id_fkey(id, full_name, whatsapp_number, meet_url)')
     .eq('student_id', user.id)
 
   const { data: appointments } = await supabase
     .from('appointments')
     .select(`
       id, start_time, end_time, status,
-      teacher:profiles!appointments_teacher_id_fkey ( id, full_name, whatsapp_number )
+      teacher_id,
+      teacher:profiles!appointments_teacher_id_fkey ( id, full_name, whatsapp_number, meet_url )
     `)
     .eq('student_id', user.id)
     .order('start_time', { ascending: true })
@@ -47,6 +50,25 @@ export default async function MinhasAulasPage() {
 
   // Agenda unificada — próximas 30 dias
   const upcoming = getUnifiedStudentAgenda(user.id, recurring || [], appointments || [], 30)
+
+  // Eventos que o aluno participa (próximos)
+  const { data: myEvents } = await supabase
+    .from('event_participants')
+    .select(`
+      event_id,
+      events (
+        id, title, description, start_time, end_time, meet_url,
+        teacher:profiles!events_teacher_id_fkey ( full_name, avatar_url )
+      )
+    `)
+    .eq('student_id', user.id)
+    .gte('events.start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+    .order('events(start_time)', { ascending: true })
+
+  const upcomingEvents = (myEvents || [])
+    .map((ep: any) => ep.events)
+    .filter(Boolean)
+    .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
   // Histórico — appointments passados (últimos 90 dias), excluindo cancelados fantasmas sem sentido
   const ninetyDaysAgo = new Date()
@@ -66,7 +88,74 @@ export default async function MinhasAulasPage() {
         </p>
       </header>
 
-      {/* ===== PRÓXIMAS AULAS ===== */}
+        {/* ===== EVENTOS ===== */}
+        {upcomingEvents.length > 0 && (
+          <section style={{ marginBottom: '2.5rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ color: 'var(--primary)' }}>🎯</span> Meus Eventos
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {upcomingEvents.map((ev: any) => {
+                const start = new Date(ev.start_time)
+                const end = new Date(ev.end_time)
+                const now = new Date()
+                const earlyEntry = new Date(start.getTime() - 15 * 60 * 1000)
+                const canEnter = now >= earlyEntry && now <= end
+                const isOngoing = now >= start && now <= end
+                const isLive = isOngoing
+                const isEnded = now > end
+                return (
+                  <div key={ev.id} style={{
+                    padding: '1rem 1.25rem', borderRadius: '16px',
+                    background: 'linear-gradient(135deg, rgba(124,58,237,0.07), rgba(59,130,246,0.04))',
+                    border: '1.5px solid rgba(124,58,237,0.2)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      <div style={{ textAlign: 'center', minWidth: '45px', borderRight: '1px solid var(--border)', paddingRight: '1rem' }}>
+                        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                          {formatInTimeZone(start, userTz, 'MMM', { locale: ptBR })}
+                        </div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
+                          {formatInTimeZone(start, userTz, 'dd')}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '99px', backgroundColor: 'var(--primary)', color: '#fff', textTransform: 'uppercase' }}>Evento</span>
+                          {isLive && <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#059669', backgroundColor: 'rgba(16,185,129,0.1)', padding: '0.15rem 0.5rem', borderRadius: '99px' }}>● Ao Vivo</span>}
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{ev.title}</div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          {formatInTimeZone(start, userTz, 'HH:mm')} – {formatInTimeZone(end, userTz, 'HH:mm')} · Prof. {ev.teacher?.full_name}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Botão de Acesso */}
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      {isEnded ? (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>Finalizado</span>
+                      ) : (
+                        <MeetLinkButton
+                          url={ev.meet_url}
+                          label={isOngoing ? 'Entrar no Evento' : canEnter ? 'Entrar no Evento' : 'Em breve'}
+                          emptyMessage="Este evento ainda não possui um link de reunião configurado."
+                          canEnter={canEnter}
+                          isOngoing={isLive}
+                          className="btn-primary"
+                          style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ===== PRÓXIMAS AULAS ===== */}
       <section style={{ marginBottom: '3rem' }}>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ color: 'var(--primary)' }}>●</span> Próximas Aulas
@@ -132,15 +221,15 @@ export default async function MinhasAulasPage() {
                           Remarcar
                         </Link>
                       )}
-                      <a
-                        href={canEnter ? meetLink : '#'}
-                        target={canEnter ? '_blank' : undefined}
-                        rel={canEnter ? 'noopener noreferrer' : undefined}
-                        className={`btn-primary ${!canEnter && 'disabled'}`}
-                        style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
-                      >
-                        {isOngoing ? 'Entrar na Aula' : canEnter ? 'Sala aberta' : 'Em breve'}
-                      </a>
+                      <MeetLinkButton
+                        url={teacher?.meet_url}
+                        label={isOngoing ? 'Entrar na Aula' : canEnter ? 'Sala aberta' : 'Em breve'}
+                        emptyMessage="Este professor ainda não configurou o link da sala de aula."
+                        canEnter={canEnter}
+                        isOngoing={isOngoing}
+                        className="btn-primary"
+                        style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
+                      />
                     </>
                   )}
                 </div>
@@ -155,10 +244,27 @@ export default async function MinhasAulasPage() {
 
         {/* CTA para agendar extra */}
         <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-          <Link href="/dashboard/schedule" className="btn-primary" style={{ display: 'inline-flex', padding: '0.8rem 2.5rem', opacity: isActive ? 1 : 0.5, pointerEvents: isActive ? 'auto' : 'none' }}>
+          <Link
+            href="/dashboard/schedule"
+            className="btn-primary"
+            style={{
+              display: 'inline-flex',
+              padding: '0.8rem 2.5rem',
+              opacity: (isActive && replacementCredits > 0) ? 1 : 0.5,
+              pointerEvents: (isActive && replacementCredits > 0) ? 'auto' : 'none'
+            }}
+          >
             + Agendar Aula Extra
+            {isActive && (
+              <span style={{ marginLeft: '0.6rem', fontSize: '0.78rem', fontWeight: 600, backgroundColor: replacementCredits > 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)', borderRadius: '99px', padding: '0.1rem 0.5rem' }}>
+                {replacementCredits} créd.
+              </span>
+            )}
           </Link>
           {!isActive && <p style={{ fontSize: '0.8rem', color: 'var(--error)', marginTop: '0.5rem' }}>Plano inativo — não é possível agendar.</p>}
+          {isActive && replacementCredits === 0 && (
+            <p style={{ fontSize: '0.8rem', color: '#CA8A04', marginTop: '0.5rem' }}>Você não tem créditos de reposição. Aguarde o professor cancelar uma aula para receber um crédito.</p>
+          )}
         </div>
       </section>
 

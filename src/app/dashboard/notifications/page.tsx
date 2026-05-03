@@ -23,7 +23,7 @@ export default async function NotificationsPage() {
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   // Admins têm página própria
-  if (profile?.role === 'admin' || profile?.role === 'admin_master') redirect('/admin/notifications')
+  if (profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev') redirect('/admin/notifications')
 
   const { data: notifications } = await supabase
     .from('notifications')

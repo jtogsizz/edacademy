@@ -1,7 +1,33 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { checkRateLimit, RATE_LIMIT_MESSAGES } from '@/utils/rate-limit'
+
+// Rotas que precisam de rate limit por IP (pré-autenticação)
+const AUTH_RATE_LIMITED_PATHS = ['/auth/callback', '/register']
 
 export async function updateSession(request: NextRequest) {
+  // ─── Rate Limit por IP em rotas de autenticação ───────────
+  const pathname = request.nextUrl.pathname
+  const isAuthRoute = AUTH_RATE_LIMITED_PATHS.some(p => pathname.startsWith(p))
+
+  if (isAuthRoute) {
+    // x-forwarded-for é o IP real no Vercel/proxies; fallback para 'unknown'
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+      request.headers.get('x-real-ip') ??
+      'unknown'
+
+    const { limited } = await checkRateLimit('auth', ip)
+
+    if (limited) {
+      return NextResponse.json(
+        { error: RATE_LIMIT_MESSAGES.auth },
+        { status: 429, headers: { 'Retry-After': '600' } }
+      )
+    }
+  }
+
+  // ─── Sessão Supabase ──────────────────────────────────────
   let supabaseResponse = NextResponse.next({
     request,
   })

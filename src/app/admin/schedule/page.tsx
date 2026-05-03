@@ -4,8 +4,35 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { utcToLocalTime } from '@/utils/agendaUtils'
 import { AvailabilityForm } from './AdminConfigForms'
+import { RemoveAvailabilityButton } from './RemoveAvailabilityButton'
 
-const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
+const DIAS = [
+  'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
+  'Quinta-feira', 'Sexta-feira', 'Sábado',
+]
+
+// Ícones SVG inline para zero dependências
+function IconClock() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  )
+}
+function IconTrash() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+    </svg>
+  )
+}
+function IconUser() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+  )
+}
 
 export default async function AdminSchedulePage() {
   const supabase = await createClient()
@@ -16,7 +43,8 @@ export default async function AdminSchedulePage() {
   const clientTz = cookieStore.get('client_tz')?.value
 
   const { data: profile } = await supabase.from('profiles').select('role, timezone').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
+  const allowedRoles = ['admin', 'admin_master', 'suporte', 'dev']
+  if (!allowedRoles.includes(profile?.role)) redirect('/dashboard')
 
   // 1. Fetch Availability (Expediente Base)
   const { data: availability } = await supabase
@@ -35,138 +63,290 @@ export default async function AdminSchedulePage() {
     .order('start_time')
 
   const userTz = profile?.timezone || clientTz || 'America/Sao_Paulo'
-  
-  // Transform Availability para a Timezone do Professor
+
+  // Transform para a Timezone do Professor
   const localAvail = (availability || []).map(av => {
     const startObj = utcToLocalTime(av.day_of_week, av.start_time, userTz)
     const endObj = utcToLocalTime(av.day_of_week, av.end_time, userTz)
-    return {
-      ...av,
-      localDay: startObj.localDay,
-      localStart: startObj.localTime,
-      localEnd: endObj.localTime
-    }
-  }).sort((a,b) => {
-    if (a.localDay !== b.localDay) return a.localDay - b.localDay
-    return a.localStart.localeCompare(b.localStart)
-  })
+    return { ...av, localDay: startObj.localDay, localStart: startObj.localTime, localEnd: endObj.localTime }
+  }).sort((a, b) => a.localDay !== b.localDay ? a.localDay - b.localDay : a.localStart.localeCompare(b.localStart))
 
-  // Transform Recurring para a Timezone do Professor
   const localRecurring = (recurring || []).map(req => {
     const startObj = utcToLocalTime(req.day_of_week, req.start_time, userTz)
     const endObj = utcToLocalTime(req.day_of_week, req.end_time, userTz)
-    return {
-      ...req,
-      localDay: startObj.localDay,
-      localStart: startObj.localTime,
-      localEnd: endObj.localTime
-    }
-  }).sort((a,b) => {
-    if (a.localDay !== b.localDay) return a.localDay - b.localDay
-    return a.localStart.localeCompare(b.localStart)
-  })
+    return { ...req, localDay: startObj.localDay, localStart: startObj.localTime, localEnd: endObj.localTime }
+  }).sort((a, b) => a.localDay !== b.localDay ? a.localDay - b.localDay : a.localStart.localeCompare(b.localStart))
+
+  // Agrupar disponibilidade por dia
+  const availByDay = new Map<number, typeof localAvail>()
+  for (const av of localAvail) {
+    if (!availByDay.has(av.localDay)) availByDay.set(av.localDay, [])
+    availByDay.get(av.localDay)!.push(av)
+  }
+
+  // Agrupar aulas fixas por dia
+  const recurringByDay = new Map<number, typeof localRecurring>()
+  for (const r of localRecurring) {
+    if (!recurringByDay.has(r.localDay)) recurringByDay.set(r.localDay, [])
+    recurringByDay.get(r.localDay)!.push(r)
+  }
 
   return (
-    <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '1000px' }}>
+    <div style={{ maxWidth: 860, margin: '0 auto', padding: '2rem 1.5rem', paddingBottom: '6rem' }}>
+
+      {/* ── HEADER ── */}
       <header style={{ marginBottom: '2.5rem' }}>
-        <Link href="/admin" style={{ color: 'var(--text-muted)', textDecoration: 'underline', marginBottom: '1rem', display: 'inline-block' }}>
-          &larr; Voltar ao Painel
+        <Link
+          href="/admin"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+            color: 'var(--text-muted)', fontSize: '0.82rem', textDecoration: 'none',
+            marginBottom: '1.25rem', transition: 'color 0.15s',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+          Voltar ao Painel
         </Link>
-        <h2 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Configuração de Expediente</h2>
-        <p style={{ color: 'var(--text-muted)' }}>Defina suas horas de disponibilidade para aulas.</p>
+        <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.03em', margin: 0 }}>
+          Configuração de Expediente
+        </h1>
+        <p style={{ color: 'var(--text-muted)', marginTop: '0.4rem', fontSize: '0.9rem' }}>
+          Defina os blocos de horário em que você está disponível para receber agendamentos.
+        </p>
       </header>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-        {/* EXPEDIENTE BASE */}
-        <section className="card" style={{ padding: '0', overflow: 'hidden' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-main)' }}>
-            <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Meu Expediente Semanal</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              Defina os blocos de horários em que você está online para receber agendamentos.
+      {/* ── CARD: ADICIONAR HORÁRIO ── */}
+      <section style={{
+        background: 'var(--bg-card, #fff)',
+        border: '1.5px solid var(--border)',
+        borderRadius: 16,
+        padding: '1.75rem 2rem',
+        marginBottom: '2rem',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+      }}>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
+            Adicionar bloco de horário
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem' }}>
+            Adicione mais de um bloco por dia para incluir pausas (ex: almoço).
+          </p>
+        </div>
+        <AvailabilityForm />
+      </section>
+
+      {/* ── EXPEDIENTE ATUAL ── */}
+      <section style={{ marginBottom: '2.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
+            Meu Expediente Semanal
+          </h2>
+          {localAvail.length > 0 && (
+            <span style={{
+              fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)',
+              background: 'var(--bg-main)', border: '1px solid var(--border)',
+              padding: '0.2rem 0.6rem', borderRadius: 99,
+            }}>
+              {localAvail.length} {localAvail.length === 1 ? 'bloco' : 'blocos'}
+            </span>
+          )}
+        </div>
+
+        {localAvail.length === 0 ? (
+          <EmptyState
+            icon="🗓"
+            title="Nenhum horário cadastrado"
+            sub="Adicione seu primeiro bloco de expediente usando o formulário acima."
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {Array.from(availByDay.entries()).map(([dayNum, slots]) => (
+              <div key={dayNum} style={{
+                background: 'var(--bg-card, #fff)',
+                border: '1.5px solid var(--border)',
+                borderRadius: 14,
+                overflow: 'hidden',
+                boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+                transition: 'box-shadow 0.15s',
+              }}
+              className="sched-day-card"
+              >
+                {/* Cabeçalho do dia */}
+                <div style={{
+                  padding: '0.75rem 1.25rem',
+                  borderBottom: '1px solid var(--border)',
+                  background: 'var(--bg-main)',
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{DIAS[dayNum]}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                    {slots.length} {slots.length === 1 ? 'bloco' : 'blocos'}
+                  </span>
+                </div>
+
+                {/* Slots do dia */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {slots.map((av, idx) => (
+                    <div key={av.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0.85rem 1.25rem',
+                      borderBottom: idx < slots.length - 1 ? '1px dashed var(--border)' : 'none',
+                      gap: '1rem',
+                    }}>
+                      {/* Horário */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <IconClock />
+                        <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
+                          {av.localStart}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>→</span>
+                        <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
+                          {av.localEnd}
+                        </span>
+                        {idx > 0 && (
+                          <span style={{
+                            fontSize: '0.65rem', fontWeight: 700, padding: '0.15rem 0.5rem',
+                            borderRadius: 99, background: 'rgba(234,88,12,0.08)',
+                            color: 'var(--primary)', border: '1px solid rgba(234,88,12,0.15)',
+                            letterSpacing: '0.04em', textTransform: 'uppercase',
+                          }}>
+                            Bloco extra
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Remover */}
+                      <RemoveAvailabilityButton
+                        availabilityId={av.id}
+                        displayTime={`${av.localStart} → ${av.localEnd}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── AULAS FIXAS (LEITURA) ── */}
+      <section>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
+              Alunos com Horário Fixo
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+              Horários que os próprios alunos configuraram como recorrentes.
             </p>
           </div>
-          
-          <div style={{ padding: '1.5rem' }}>
-            <AvailabilityForm />
-          </div>
+          {localRecurring.length > 0 && (
+            <span style={{
+              fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)',
+              background: 'var(--bg-main)', border: '1px solid var(--border)',
+              padding: '0.2rem 0.6rem', borderRadius: 99,
+            }}>
+              {localRecurring.length} {localRecurring.length === 1 ? 'aula' : 'aulas'}
+            </span>
+          )}
+        </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  <th style={{ padding: '1rem' }}>DIA DA SEMANA</th>
-                  <th style={{ padding: '1rem' }}>INÍCIO</th>
-                  <th style={{ padding: '1rem' }}>FIM</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>AÇÕES</th>
-                </tr>
-              </thead>
-              <tbody>
-                {localAvail?.map((av, index) => {
-                  const isSameDayAsPrevious = index > 0 && localAvail[index-1].localDay === av.localDay;
-                  return (
-                    <tr key={av.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '1rem', fontWeight: isSameDayAsPrevious ? 400 : 600 }}>
-                        {isSameDayAsPrevious ? <span style={{ color: 'var(--text-muted)', paddingLeft: '1rem' }}>↳ bloco extra</span> : diasSemana[av.localDay]}
-                      </td>
-                      <td style={{ padding: '1rem' }}>{av.localStart}</td>
-                      <td style={{ padding: '1rem' }}>{av.localEnd}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        <form action={async () => {
-                          'use server'
-                          const { removeAvailability } = await import('./actions')
-                          await removeAvailability(av.id)
-                        }}>
-                          <button type="submit" style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.85rem' }}>Remover</button>
-                        </form>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {(!localAvail || localAvail.length === 0) && (
-                  <tr><td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum horário de expediente cadastrado.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {localRecurring.length === 0 ? (
+          <EmptyState
+            icon="👥"
+            title="Nenhuma aula fixa vinculada"
+            sub="Quando alunos configurarem horários fixos com você, eles aparecerão aqui."
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {Array.from(recurringByDay.entries()).map(([dayNum, classes]) => (
+              <div key={dayNum} style={{
+                background: 'var(--bg-card, #fff)',
+                border: '1.5px solid var(--border)',
+                borderRadius: 14,
+                overflow: 'hidden',
+                boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+              }}
+              className="sched-day-card"
+              >
+                {/* Cabeçalho do dia */}
+                <div style={{
+                  padding: '0.75rem 1.25rem',
+                  borderBottom: '1px solid var(--border)',
+                  background: 'var(--bg-main)',
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#6366f1', flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{DIAS[dayNum]}</span>
+                </div>
 
-        {/* AULAS FIXAS (READING ONLY) */}
-        <section className="card" style={{ padding: '0', overflow: 'hidden' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-main)' }}>
-            <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Alunos com Horário Fixo</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              Estes são os horários que os próprios alunos escolheram como recorrentes.
-            </p>
+                {/* Aulas do dia */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {classes.map((cls, idx) => {
+                    const studentProf = cls.student as any
+                    return (
+                      <div key={cls.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '1rem',
+                        padding: '0.85rem 1.25rem',
+                        borderBottom: idx < classes.length - 1 ? '1px dashed var(--border)' : 'none',
+                        flexWrap: 'wrap',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 140 }}>
+                          <IconClock />
+                          <span style={{ fontWeight: 700, fontSize: '0.95rem', fontVariantNumeric: 'tabular-nums' }}>
+                            {cls.localStart}
+                          </span>
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>→</span>
+                          <span style={{ fontWeight: 700, fontSize: '0.95rem', fontVariantNumeric: 'tabular-nums' }}>
+                            {cls.localEnd}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+                          <IconUser />
+                          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                            {studentProf?.full_name || 'Aluno'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
+        )}
+      </section>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  <th style={{ padding: '1rem' }}>ALUNO</th>
-                  <th style={{ padding: '1rem' }}>DIA</th>
-                  <th style={{ padding: '1rem' }}>HORÁRIO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {localRecurring?.map(req => {
-                  const studentProf = req.student as any
-                  return (
-                    <tr key={req.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '1rem', fontWeight: 600 }}>{studentProf?.full_name}</td>
-                      <td style={{ padding: '1rem' }}>{diasSemana[req.localDay]}</td>
-                      <td style={{ padding: '1rem' }}>{req.localStart} - {req.localEnd}</td>
-                    </tr>
-                  )
-                })}
-                {(!localRecurring || localRecurring.length === 0) && (
-                  <tr><td colSpan={3} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma aula fixa vinculada no momento.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .sched-day-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important; }
+        .sched-remove-btn:hover {
+          background: rgba(220,38,38,0.07) !important;
+          border-color: rgba(220,38,38,0.2) !important;
+        }
+        @media (max-width: 500px) {
+          .sched-day-card > div > div { flex-wrap: wrap; gap: 0.5rem !important; }
+        }
+      `}} />
+    </div>
+  )
+}
+
+// ── Empty state component ────────────────────────────────────────────────────
+function EmptyState({ icon, title, sub }: { icon: string; title: string; sub: string }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '3rem 2rem', textAlign: 'center',
+      background: 'var(--bg-card, #fff)',
+      border: '1.5px dashed var(--border)',
+      borderRadius: 14,
+    }}>
+      <span style={{ fontSize: '2.25rem', marginBottom: '0.75rem', lineHeight: 1 }}>{icon}</span>
+      <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.4rem' }}>{title}</div>
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', maxWidth: 340 }}>{sub}</div>
     </div>
   )
 }

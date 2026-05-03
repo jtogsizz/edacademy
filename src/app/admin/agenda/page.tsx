@@ -9,6 +9,7 @@ import { cookies } from 'next/headers'
 import AdminCancellationControls from './AdminCancellationControls'
 import TeacherSelector from './TeacherSelector'
 import { getUnifiedTeacherAgenda } from '@/utils/agendaUtils'
+import MeetLinkButton from '@/components/MeetLinkButton'
 
 export default async function TeacherAgendaPage({ searchParams }: { searchParams: Promise<{ teacher_id?: string }> }) {
   const { teacher_id: qTeacherId } = await searchParams
@@ -19,29 +20,33 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('id, role, timezone').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'admin_master') redirect('/dashboard')
+  if (profile?.role !== 'admin' && profile?.role !== 'admin_master' && profile?.role !== 'suporte' && profile?.role !== 'dev') redirect('/dashboard')
 
-  const isAdminMaster = profile?.role === 'admin_master'
+  const isManager = profile?.role === 'admin_master' || profile?.role === 'dev' || profile?.role === 'suporte'
 
-  // Admin Master pode selecionar professor pelo query param; admin regular vê apenas a própria agenda
+  // Managers podem selecionar professor pelo query param; admin regular vê apenas a própria agenda
   let viewingTeacherId = user.id
   let teacherList: { id: string; full_name: string }[] = []
 
-  if (isAdminMaster) {
+  if (isManager) {
     const { data: teachers } = await supabase
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, meet_url')
       .in('role', ['admin', 'admin_master'])
       .order('full_name')
     teacherList = teachers || []
-    // Usa o query param se for um ID válido da lista, caso contrário cai para o próprio usuário
+    
+    // Usa o query param se for um ID válido da lista.
     if (qTeacherId && teacherList.some(t => t.id === qTeacherId)) {
       viewingTeacherId = qTeacherId
+    } else if (teacherList.length > 0 && profile?.role !== 'admin_master') {
+      // Se for dev/suporte (não tem agenda própria), cai na agenda do primeiro professor
+      viewingTeacherId = teacherList[0].id
     }
   }
 
-  const viewingTeacher = isAdminMaster
-    ? teacherList.find(t => t.id === viewingTeacherId) || { full_name: 'Minha Agenda' }
+  const viewingTeacher = isManager
+    ? teacherList.find(t => t.id === viewingTeacherId) || { id: '', full_name: 'Minha Agenda' }
     : null
 
   const userTz = profile?.timezone || clientTz || 'America/Sao_Paulo'
@@ -56,7 +61,7 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
       end_time,
       status,
       teacher_id,
-      teacher:profiles!appointments_teacher_id_fkey ( id, full_name ),
+      teacher:profiles!appointments_teacher_id_fkey ( id, full_name, meet_url ),
       student:profiles!appointments_student_id_fkey ( id, full_name, whatsapp_number )
     `)
     .order('start_time', { ascending: true })
@@ -73,7 +78,7 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
       start_time,
       end_time,
       teacher_id,
-      teacher:profiles!recurring_classes_teacher_id_fkey ( id, full_name ),
+      teacher:profiles!recurring_classes_teacher_id_fkey ( id, full_name, meet_url ),
       student:profiles!recurring_classes_student_id_fkey ( id, full_name, whatsapp_number )
     `)
     .eq('teacher_id', viewingTeacherId)
@@ -109,10 +114,10 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
             &larr; Voltar ao Início
           </Link>
           <h2 style={{ fontSize: '1.8rem', margin: 0, color: 'var(--primary)' }}>
-            {isAdminMaster && viewingTeacher ? `Agenda: ${viewingTeacher.full_name}` : 'Minha Agenda de Aulas'}
+            {isManager && viewingTeacher && viewingTeacher.id !== user.id ? `Agenda: ${viewingTeacher.full_name}` : 'Minha Agenda de Aulas'}
           </h2>
           <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>Acompanhe e gerencie as aulas do período.</p>
-          {isAdminMaster && teacherList.length > 0 && (
+          {isManager && teacherList.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
               <TeacherSelector teachers={teacherList} selectedId={viewingTeacherId} />
             </div>
@@ -189,7 +194,7 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
                         </a>
                       )}
                     </div>
-                    {isAdminMaster && apt.teacher?.full_name && (
+                    {isManager && apt.teacher?.full_name && (
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                         Professor: {apt.teacher.full_name}
                       </div>
@@ -206,15 +211,15 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
                       ) : (
                         <>
                           <AdminCancellationControls appointmentId={apt.id} type="single" />
-                          <a
-                            href={canEnter ? meetLink : '#'}
-                            target={canEnter ? "_blank" : undefined}
-                            rel={canEnter ? "noopener noreferrer" : undefined}
-                            className={`btn-primary ${!canEnter && 'disabled'}`}
-                            style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', opacity: canEnter ? 1 : 0.4, cursor: canEnter ? 'pointer' : 'not-allowed' }}
-                          >
-                            {isOngoing ? 'Entrar Agora' : canEnter ? 'Sala aberta' : 'Em breve'}
-                          </a>
+                          <MeetLinkButton
+                            url={apt.teacher?.meet_url}
+                            label={isOngoing ? 'Entrar Agora' : canEnter ? 'Sala aberta' : 'Em breve'}
+                            emptyMessage="Link do Meet não configurado para este professor."
+                            canEnter={canEnter}
+                            isOngoing={isOngoing}
+                            className="btn-primary"
+                            style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem' }}
+                          />
                         </>
                       )}
                     </div>
