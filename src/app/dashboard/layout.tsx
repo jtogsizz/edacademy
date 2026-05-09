@@ -26,15 +26,12 @@ export default async function DashboardLayout({
     redirect('/meus-eventos')
   }
 
-  if (profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev') {
-    redirect('/admin')
-  }
 
   return (
     <div>
       <TimezoneDetector />
       {children}
-      <BottomNav role="student" />
+      <BottomNav role={profile?.role || 'student'} />
     </div>
   );
 }

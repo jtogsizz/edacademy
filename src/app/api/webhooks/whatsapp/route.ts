@@ -70,7 +70,7 @@ export async function POST(request: Request) {
 
     // Impedir reprocessamento se o lembrete já estiver concluído
     if (renewal.status === 'paid' || renewal.status === 'inactive') {
-      console.log(`[Webhook] O código ${command.shortCode} já consta como processado (${renewal.status}).`);
+      // TODO: [observabilidade] Substituir por logging estruturado para auditoria de renovações já processadas
       return NextResponse.json({ message: 'Lembrete já concluído anteriormente' });
     }
 
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
 
         if (renewalUpdateErr) throw renewalUpdateErr;
 
-        console.log(`[Webhook] Sucesso: Código ${command.shortCode} renovou assinatura ${sub.id} até ${formattedDate}`);
+        // TODO: [observabilidade] Substituir por logging estruturado para auditoria financeira de renovação bem-sucedida
 
       } else if (command.type === 'NAO_PAGO') {
         // Aluno optou por não renovar no momento -> Marcar assinatura como inativa
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
 
         if (renewalUpdateErr) throw renewalUpdateErr;
 
-        console.log(`[Webhook] Sucesso: Assinatura ${renewal.subscription_id} inativada via código ${command.shortCode}`);
+        // TODO: [observabilidade] Substituir por logging estruturado para auditoria financeira de inativação bem-sucedida
       }
 
       return NextResponse.json({ success: true, command: command.type });

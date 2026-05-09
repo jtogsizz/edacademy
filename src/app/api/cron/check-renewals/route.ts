@@ -69,8 +69,6 @@ export async function GET(request: Request) {
     targetDate.setDate(targetDate.getDate() + 3);
     const dateString = targetDate.toISOString().split('T')[0];
 
-    console.log(`[Cron] Verificando assinaturas com vencimento em: ${dateString}`);
-
     // Buscar assinaturas ativas com o perfil do aluno (nome + whatsapp)
     const { data: subscriptions, error } = await supabaseAdmin
       .from('subscriptions')

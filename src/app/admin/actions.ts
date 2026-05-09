@@ -10,7 +10,7 @@ export async function changeUserRole(
   targetUserId: string,
   newRole: 'student' | 'admin' | 'admin_master' | 'suporte' | 'dev'
 ) {
-  console.log(`[changeUserRole] Chamado para usuário ${targetUserId} com novo cargo: ${newRole}`)
+
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -21,7 +21,7 @@ export async function changeUserRole(
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const executorRole = profile?.role
-  console.log(`[changeUserRole] Executor (${user.id}): ${executorRole}`)
+
 
   // Somente admin_master ou dev podem alterar cargos
   if (executorRole !== 'admin_master' && executorRole !== 'dev') {
@@ -129,7 +129,7 @@ export async function updateSubscriptionManual(
     })
   }
 
-  console.log(`[updateSubscriptionManual] Sucesso para aluno ${studentId}`)
+
   revalidatePath('/admin/profile')
 }
 
@@ -137,7 +137,7 @@ export async function updateSubscriptionManual(
  * Alterna o status da assinatura e registra no histórico.
  */
 export async function toggleSubscriptionStatus(studentId: string, currentStatus: string) {
-  console.log(`[toggleSubscriptionStatus] Início: Aluno ${studentId}, Status Atual Informado: ${currentStatus}`)
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -146,7 +146,7 @@ export async function toggleSubscriptionStatus(studentId: string, currentStatus:
   }
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  console.log(`[toggleSubscriptionStatus] Executado por: ${user.id} (Role: ${profile?.role})`)
+
 
   // Somente ADMIN ou ADMIN MASTER podem alternar status
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev'
@@ -156,7 +156,7 @@ export async function toggleSubscriptionStatus(studentId: string, currentStatus:
   }
 
   const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
-  console.log(`[toggleSubscriptionStatus] Novo Status planejado: ${newStatus}`)
+
 
   // Regra: bloquear ativação sem idioma definido
   if (newStatus === 'active') {
@@ -212,7 +212,7 @@ export async function toggleSubscriptionStatus(studentId: string, currentStatus:
     })
   }
 
-  console.log(`[toggleSubscriptionStatus] Sucesso para aluno ${studentId}`)
+
   revalidatePath('/admin/profile')
 }
 
@@ -249,27 +249,6 @@ export async function setStudentLanguage(studentId: string, language: string) {
   revalidatePath('/admin/profile')
 }
 
-/**
- * Atualiza as informações de contato do próprio administrador.
- */
-export async function updateAdminProfile(fullName: string, whatsapp: string, instagram: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      full_name: fullName,
-      whatsapp_number: whatsapp || null,
-      instagram_handle: instagram || null,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', user.id)
-
-  if (error) throw error
-  revalidatePath('/admin/profile')
-}
 
 export async function deleteUserAccount(targetUserId: string) {
   const supabase = await createClient()

@@ -751,18 +751,11 @@ export async function cancelAppointmentByTeacher(id: string, reason: string) {
   const shouldGrantCredit = reason !== 'Aluno não compareceu'
   
   if (updatedApt.student_id) {
-    console.log('--- AUDITORIA DE CANCELAMENTO ---', {
-      method: 'cancelAppointmentByTeacher',
-      student_id: updatedApt.student_id,
-      reason,
-      shouldGrantCredit,
-    })
+    // TODO: [observabilidade] Substituir por logging estruturado (ex: Sentry/Datadog) para auditoria de créditos financeiros
+    // method: cancelAppointmentByTeacher | student_id, reason, shouldGrantCredit
 
     if (shouldGrantCredit) {
-      console.log('>>> Chamando RPC: add_replacement_credit com', { student_uuid: updatedApt.student_id })
       const { data: rpcData, error: rpcErr } = await supabase.rpc('add_replacement_credit', { student_uuid: updatedApt.student_id })
-      
-      console.log('<<< Retorno da RPC add_replacement_credit:', { rpcData, rpcErr })
 
       if (rpcErr) {
         console.error('Erro ao conceder crédito:', rpcErr)
@@ -867,18 +860,11 @@ export async function cancelDayByTeacher(dateISO: string, reason: string) {
           continue
         }
 
-        console.log('--- AUDITORIA DE CANCELAMENTO DIA ---', {
-          method: 'cancelDayByTeacher',
-          student_id: rec.student_id,
-          reason,
-          shouldGrantCredit
-        })
+        // TODO: [observabilidade] Substituir por logging estruturado (ex: Sentry/Datadog) para auditoria de créditos financeiros
+        // method: cancelDayByTeacher | student_id, reason, shouldGrantCredit
 
         if (shouldGrantCredit) {
-          console.log('>>> Chamando RPC: add_replacement_credit com', { student_uuid: rec.student_id })
           const { data: rpcData, error: rpcErr } = await supabase.rpc('add_replacement_credit', { student_uuid: rec.student_id })
-          
-          console.log('<<< Retorno da RPC add_replacement_credit no dia:', { rpcData, rpcErr })
 
           if (rpcErr) {
             console.error('Erro ao conceder crédito no cancelamento do dia:', rpcErr)

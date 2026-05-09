@@ -1,6 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import { format } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
@@ -10,6 +9,8 @@ import AdminCancellationControls from './AdminCancellationControls'
 import TeacherSelector from './TeacherSelector'
 import { getUnifiedTeacherAgenda } from '@/utils/agendaUtils'
 import MeetLinkButton from '@/components/MeetLinkButton'
+import InternalPageHeader from '@/components/InternalPageHeader'
+import NotificationBell from '@/components/NotificationBell'
 
 export default async function TeacherAgendaPage({ searchParams }: { searchParams: Promise<{ teacher_id?: string }> }) {
   const { teacher_id: qTeacherId } = await searchParams
@@ -107,29 +108,28 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
   const todayStr = format(new Date(), 'yyyy-MM-dd')
 
   return (
-    <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '1000px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-        <div>
-          <Link href="/admin" style={{ color: 'var(--text-muted)', textDecoration: 'underline', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-            &larr; Voltar ao Início
-          </Link>
-          <h2 style={{ fontSize: '1.8rem', margin: 0, color: 'var(--primary)' }}>
-            {isManager && viewingTeacher && viewingTeacher.id !== user.id ? `Agenda: ${viewingTeacher.full_name}` : 'Minha Agenda de Aulas'}
-          </h2>
-          <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>Acompanhe e gerencie as aulas do período.</p>
-          {isManager && teacherList.length > 0 && (
-            <div style={{ marginTop: '1rem' }}>
-              <TeacherSelector teachers={teacherList} selectedId={viewingTeacherId} />
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <AdminCancellationControls dateStr={todayStr} type="day" />
-          <LogoutButton />
-        </div>
-      </header>
+    <div className="container" style={{ padding: '2rem 1.5rem', paddingBottom: '6rem', maxWidth: '1000px' }}>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <InternalPageHeader
+        title={isManager && viewingTeacher && viewingTeacher.id !== user.id ? `Agenda: ${viewingTeacher.full_name}` : 'Minha Agenda'}
+        subtitle="Acompanhe e gerencie as aulas do período"
+        breadcrumb={[{ label: 'Dashboard', href: '/admin' }, { label: 'Agenda' }]}
+        actions={
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <AdminCancellationControls dateStr={todayStr} type="day" />
+            <NotificationBell href="/admin/notifications" />
+            <LogoutButton />
+          </div>
+        }
+      />
+
+      {isManager && teacherList.length > 0 && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <TeacherSelector teachers={teacherList} selectedId={viewingTeacherId} />
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {upcomingApts.length > 0 ? (
           upcomingApts.map((apt: any) => {
             const start = new Date(apt.start_time)
@@ -149,18 +149,20 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
             return (
               <div 
                 key={apt.id} 
-                className="card" 
                 style={{ 
-                  padding: '1.5rem', 
+                  background: '#FFFFFF',
+                  border: '1px solid rgba(229,231,235,0.7)',
+                  borderLeft: isCancelled ? '4px solid #9CA3AF' : `4px solid ${apt.is_recurring ? 'var(--primary)' : '#F59E0B'}`,
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '1.25rem 1.5rem', 
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center', 
                   flexWrap: 'wrap', 
-                  gap: '1.5rem', 
-                  borderLeft: isCancelled ? '5px solid var(--text-muted)' : `5px solid ${apt.is_recurring ? 'var(--primary)' : '#EAB308'}`,
-                  opacity: isCancelled ? 0.6 : 1,
-                  backgroundColor: isCancelled ? 'var(--bg-main)' : (apt.is_recurring ? 'var(--bg-card)' : 'rgba(234, 179, 8, 0.05)'),
-                  filter: isCancelled ? 'grayscale(0.5)' : 'none'
+                  gap: '1.25rem', 
+                  opacity: isCancelled ? 0.55 : 1,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'box-shadow 0.2s',
                 }}
               >
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
@@ -229,9 +231,10 @@ export default async function TeacherAgendaPage({ searchParams }: { searchParams
             )
           })
         ) : (
-          <div className="card" style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}>
-            <h3 style={{ marginBottom: '0.5rem' }}>Nenhum agendamento encontrado</h3>
-            <p>Você não possui aulas agendadas para o período selecionado.</p>
+          <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1.5px dashed rgba(229,231,235,0.8)', borderRadius: 'var(--radius-lg)', background: '#FFFFFF' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📅</div>
+            <h3 style={{ marginBottom: '0.4rem', color: 'var(--text-main)', fontWeight: 700 }}>Sem aulas agendadas</h3>
+            <p style={{ fontSize: '0.875rem' }}>Nenhuma aula encontrada para o período selecionado.</p>
           </div>
         )}
       </div>

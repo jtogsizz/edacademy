@@ -1,5 +1,5 @@
 .navSpacer {
-  height: 80px; /* Espaço para não sobrepor o conteúdo no fim da página */
+  height: 72px;
 }
 
 .bottomNav {
@@ -7,74 +7,109 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: var(--bg-card);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-  z-index: 1000;
-  padding-bottom: env(safe-area-inset-bottom, 0px); /* Suporte para iPhone moderno */
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(229, 231, 235, 0.8);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.06);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Em telas maiores, podemos fazer essa barra parecer um menu flutuante ou mantê-la embaixo */
+.navList {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 64px;
+}
+
+.navItem {
+  flex: 1;
+  display: flex;
+}
+
+.navLink {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-decoration: none;
+  color: #9CA3AF;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.2s;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navLink:hover {
+  color: #374151;
+}
+
+.navLink.active {
+  color: #EA580C;
+  font-weight: 600;
+}
+
+.iconWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.75;
+  transition: transform 0.2s;
+}
+
+.navLink.active .icon {
+  stroke-width: 2.25;
+  transform: scale(1.05);
+}
+
+.activeDot {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #EA580C;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.label {
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Desktop: barra flutuante centralizada como era originalmente */
 @media (min-width: 768px) {
   .bottomNav {
-    /* Deixando flutuante no desktop p/ visual mais limpo */
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     right: auto;
     width: 100%;
     max-width: 500px;
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--border);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border-radius: 20px; /* var(--radius-xl) equivalente */
+    border: 1px solid rgba(229, 231, 235, 0.9);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.95);
   }
-}
-
-.navList {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  list-style: none;
-  height: 64px;
-  padding: 0 1rem;
-}
-
-.navItem {
-  flex: 1;
-}
-
-.navLink {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  color: var(--text-muted);
-  height: 100%;
-  padding: 0.5rem;
-  transition: all 0.2s ease;
-}
-
-.navLink:hover {
-  color: var(--primary);
-}
-
-.active {
-  color: var(--primary);
-  /* background-color: var(--primary-light); -- opcional para destacar */
-}
-
-.active .icon {
-  transform: translateY(-2px);
-}
-
-.icon {
-  width: 24px;
-  height: 24px;
-  transition: transform 0.2s ease;
-}
-
-.label {
-  font-size: 0.75rem;
-  font-weight: 500;
+  
+  .navList {
+    height: 68px;
+    padding: 0 1rem;
+  }
 }

@@ -7,8 +7,9 @@ import { getUnifiedStudentAgenda } from '@/utils/agendaUtils'
 import MeetLinkButton from '@/components/MeetLinkButton'
 import { unstable_noStore as noStore } from 'next/cache'
 import { cookies } from 'next/headers'
+import InternalPageHeader from '@/components/InternalPageHeader'
 
-export const metadata = { title: 'Minhas Aulas' }
+export const metadata = { title: 'Minhas Aulas · EdAcademy' }
 
 export default async function MinhasAulasPage() {
   noStore()
@@ -80,13 +81,12 @@ export default async function MinhasAulasPage() {
 
   return (
     <div className="container" style={{ padding: '2rem 1.5rem', paddingBottom: '6rem', maxWidth: '900px' }}>
-      {/* Header */}
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h2 style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>Minhas Aulas</h2>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Próximas aulas agendadas e histórico completo.
-        </p>
-      </header>
+
+      <InternalPageHeader
+        title="Minhas Aulas"
+        subtitle="Próximas aulas agendadas e histórico completo"
+        breadcrumb={[{ label: 'Início', href: '/dashboard' }, { label: 'Minhas Aulas' }]}
+      />
 
         {/* ===== EVENTOS ===== */}
         {upcomingEvents.length > 0 && (
@@ -176,18 +176,20 @@ export default async function MinhasAulasPage() {
             return (
               <div
                 key={apt.id}
-                className="card"
                 style={{
-                  padding: '1.2rem',
+                  background: '#FFFFFF',
+                  border: '1px solid rgba(229,231,235,0.7)',
+                  borderLeft: isCancelled ? '4px solid #9CA3AF' : `4px solid ${apt.is_recurring ? 'var(--primary)' : '#F59E0B'}`,
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '1.1rem 1.25rem',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   flexWrap: 'wrap',
-                  gap: '1.5rem',
-                  borderLeft: isCancelled ? '4px solid var(--text-muted)' : `4px solid ${apt.is_recurring ? 'var(--primary)' : '#EAB308'}`,
-                  opacity: isCancelled ? 0.6 : 1,
-                  backgroundColor: isCancelled ? 'var(--bg-main)' : (apt.is_recurring ? 'var(--bg-card)' : 'rgba(234, 179, 8, 0.05)'),
-                  filter: isCancelled ? 'grayscale(1)' : 'none'
+                  gap: '1.25rem',
+                  opacity: isCancelled ? 0.55 : 1,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  transition: 'box-shadow 0.2s',
                 }}
               >
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
@@ -236,8 +238,10 @@ export default async function MinhasAulasPage() {
               </div>
             )
           }) : (
-            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}>
-              Nenhuma aula nos próximos 30 dias.
+            <div style={{ padding: '3.5rem 2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1.5px dashed rgba(229,231,235,0.8)', borderRadius: 'var(--radius-lg)', background: '#FFFFFF' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📅</div>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.4rem', color: 'var(--text-main)' }}>Nenhuma aula agendada</div>
+              <p style={{ fontSize: '0.83rem' }}>Sem aulas nos próximos 30 dias.</p>
             </div>
           )}
         </div>

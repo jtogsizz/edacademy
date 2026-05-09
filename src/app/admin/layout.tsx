@@ -35,7 +35,7 @@ export default async function AdminLayout({
     <div>
       <TimezoneDetector />
       {children}
-      <BottomNav role="admin" />
+      <BottomNav role={profile?.role || 'admin'} />
     </div>
   );
 }

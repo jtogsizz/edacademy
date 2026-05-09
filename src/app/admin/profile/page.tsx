@@ -12,6 +12,7 @@ import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
 import { changeUserRole, setTeacherLanguage, setStudentLanguage, updatePixConfig } from '@/app/admin/actions'
 import { isMasterRole, isAdminRole, isDevRole, allowedTargetRoles, ROLE_LABELS, ROLE_BADGE_STYLE, AppRole } from '@/utils/roles'
+import NotificationBell from '@/components/NotificationBell'
 
 // Gera avatar com iniciais + cor derivada do nome
 function AvatarInitials({ name, size = 40 }: { name: string; size?: number }) {
@@ -29,38 +30,6 @@ function AvatarInitials({ name, size = 40 }: { name: string; size?: number }) {
   )
 }
 
-// ─── Botões de ação que o server renderiza e passa pro dropdown ───────────────
-
-function BtnToggle({ studentId, subStatus, isActive }: { studentId: string; subStatus: string; isActive: boolean }) {
-  return <ToggleSubscriptionButton studentId={studentId} currentStatus={subStatus} isActive={isActive} />
-}
-
-function BtnManual({ studentId, studentName, subStatus, subEndDate, subNotes }: any) {
-  return (
-    <SubscriptionManualManager
-      studentId={studentId}
-      studentName={studentName}
-      currentStatus={subStatus}
-      currentEndDate={subEndDate}
-      currentNotes={subNotes}
-    />
-  )
-}
-
-function BtnRole({ studentId }: { studentId: string }) {
-  return (
-    <form action={async () => {
-      'use server'
-      await changeUserRole(studentId, 'admin')
-    }}>
-      <button type="submit">Tornar Professor</button>
-    </form>
-  )
-}
-
-function BtnDelete({ studentId, studentName }: { studentId: string; studentName: string }) {
-  return <DeleteUserButton userId={studentId} userName={studentName} />
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -161,18 +130,36 @@ export default async function AdminProfilePage(props: { searchParams?: Promise<a
   const hasFilters = !!(sp.q || sp.lang || sp.sort || sp.status)
   const today = new Date(); today.setHours(0, 0, 0, 0)
 
+  const FINANCEIRO_ROLES = ['admin_master', 'suporte', 'dev']
+  const canSeeFinanceiro = FINANCEIRO_ROLES.includes(profile?.role)
+
   return (
     <div className="container" style={{ padding: '2rem 1.5rem', paddingBottom: '8rem', maxWidth: '1280px' }}>
 
       {/* ── HEADER ── */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Painel Admin</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '0.25rem' }}>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 700, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Painel Admin</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
             Gerencie alunos, professores e configurações da plataforma
           </p>
         </div>
-        <LogoutButton />
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {canSeeFinanceiro && (
+            <Link href="/admin/financeiro" style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+              background: 'var(--primary-gradient)', color: '#fff',
+              padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)',
+              fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none',
+              boxShadow: '0 2px 8px rgba(234,88,12,0.2)',
+              transition: 'all 0.2s',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+              Painel Financeiro
+            </Link>
+          )}
+          <LogoutButton />
+        </div>
       </header>
 
       {/* ── PERFIL DO ADMIN ── */}

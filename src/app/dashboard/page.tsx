@@ -1,35 +1,28 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import Feed from '@/components/Feed'
-import LogoutButton from '@/components/LogoutButton'
-import NotificationBell from '@/components/NotificationBell'
+import { unstable_noStore as noStore } from 'next/cache'
+import { cookies } from 'next/headers'
+import AdminDashboardView from './AdminDashboardView'
+import StudentDashboardView from './StudentDashboardView'
 
-export default async function DashboardFeedPage() {
+export const metadata = { title: 'Início · EdAcademy' }
+
+export default async function DashboardPage() {
+  noStore()
   const supabase = await createClient()
+  const cookieStore = await cookies()
+  const clientTz = cookieStore.get('client_tz')?.value
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  
-  if (profile?.role === 'admin' || profile?.role === 'admin_master' || profile?.role === 'suporte' || profile?.role === 'dev') {
-    redirect('/admin')
+
+  const isAdminRole = ['admin', 'admin_master', 'suporte', 'dev'].includes(profile?.role)
+
+  if (isAdminRole) {
+    return <AdminDashboardView user={user} profile={profile} clientTz={clientTz} />
   }
 
-  return (
-    <div className="container" style={{ padding: '2rem 1.5rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h2>Feed</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Acompanhe as novidades e avisos.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <NotificationBell href="/dashboard/notifications" />
-          <LogoutButton />
-        </div>
-      </header>
-
-      <Feed isAdmin={false} />
-    </div>
-  )
+  return <StudentDashboardView user={user} profile={profile} clientTz={clientTz} />
 }
