@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 
@@ -100,7 +101,7 @@ export default function ChatSidebar({ myUserId, myRole, basePath }: ChatSidebarP
               <li key={s.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isActive ? 'var(--bg-main)' : 'transparent' }}>
                 <div className="chat-row-hover" style={{ display: 'flex', alignItems: 'center', padding: '1rem 1.5rem', transition: 'background 0.2s', backgroundColor: isActive ? 'var(--bg-main)' : 'transparent', textDecoration: 'none' }}>
                   <Link href={`?viewUser=${s.id}`} scroll={false} style={{ position: 'relative', flexShrink: 0, textDecoration: 'none' }}>
-                    <img src={avatar} alt="Foto" style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)', display: 'block' }} />
+                    <Image src={avatar} alt="Foto" width={42} height={42} style={{ borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)', display: 'block' }} />
                     <div style={{ position: 'absolute', bottom: 0, right: 0, width: '10px', height: '10px', backgroundColor: 'var(--success)', borderRadius: '50%', border: '2px solid var(--bg-card)' }}></div>
                   </Link>
                   <Link href={`${basePath}/${s.id}`} style={{ flex: 1, overflow: 'hidden', color: 'inherit', textDecoration: 'none', marginLeft: '1rem' }}>

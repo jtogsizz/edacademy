@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/utils/supabase/client'
 
 const MOCK_EMOJIS = ['❤️', '👍', '😂', '👋', '🎯']
@@ -132,7 +133,7 @@ export default function ChatClientView({ initialMessages, myUserId, chatPartnerI
              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </Link>
           <Link href={`?viewUser=${chatPartnerId}`} scroll={false} style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
-            <img src={partnerAvatar} alt="Avatar" style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+            <Image src={partnerAvatar} alt="Avatar" width={42} height={42} style={{ borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
             <div>
               <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0, transition: 'color 0.2s' }} className="hover:text-[var(--primary)]">{chatPartnerName}</h2>
             </div>
