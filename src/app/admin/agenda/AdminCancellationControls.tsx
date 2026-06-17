@@ -8,9 +8,10 @@ interface Props {
   appointmentId?: string
   dateStr?: string // "YYYY-MM-DD"
   type: 'single' | 'day'
+  onSuccess?: (appointmentId?: string) => void
 }
 
-export default function AdminCancellationControls({ appointmentId, dateStr, type }: Props) {
+export default function AdminCancellationControls({ appointmentId, dateStr, type, onSuccess }: Props) {
   const [showModal, setShowModal] = useState(false)
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
@@ -59,6 +60,7 @@ export default function AdminCancellationControls({ appointmentId, dateStr, type
       } else {
         setShowModal(false)
         router.refresh()
+        onSuccess?.(appointmentId)
       }
     } catch (e) {
       setError('Ocorreu um erro ao processar o cancelamento.')

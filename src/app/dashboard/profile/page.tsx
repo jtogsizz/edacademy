@@ -8,9 +8,11 @@ import ProfileEditContainer from '@/components/ProfileEditContainer'
 import RecurringClassForm from './RecurringClassForm'
 import RemoveClassButton from './RemoveClassButton'
 import PixPaymentModal from '@/components/PixPaymentModal'
+import PreferencesToggle from '@/components/PreferencesToggle'
 import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
 import { cookies } from 'next/headers'
+import { getTranslation } from '@/i18n/server'
 
 export default async function StudentProfilePage() {
   // Garante que essa página sempre busca dados frescos do banco, nunca do cache
@@ -19,6 +21,7 @@ export default async function StudentProfilePage() {
 
   const cookieStore = await cookies()
   const clientTz = cookieStore.get('client_tz')?.value
+  const t = await getTranslation()
 
   const {
     data: { user },
@@ -116,13 +119,13 @@ export default async function StudentProfilePage() {
 
         {/* Status Info — Plano e Idioma */}
         <section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Sua Conta</h4>
+          <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>{t.profile.account}</h4>
 
           {/* Status do Plano */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '0.75rem' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Plano</div>
-              <div style={{ fontWeight: 600 }}>{isActive ? 'EdAcademy Pro' : 'Sem plano ativo'}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{t.profile.plan}</div>
+              <div style={{ fontWeight: 600 }}>{isActive ? t.profile.planActive : t.profile.planInactive}</div>
             </div>
             <span style={{
               fontSize: '0.72rem',
@@ -135,14 +138,14 @@ export default async function StudentProfilePage() {
               letterSpacing: '0.03em',
               textTransform: 'uppercase'
             }}>
-              {isActive ? '● Ativo' : '● Inativo'}
+              {isActive ? `● ${t.profile.active}` : `● ${t.profile.inactive}`}
             </span>
           </div>
 
           {/* Idioma com Acesso */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '0.75rem' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Idioma</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{t.profile.language}</div>
               <div style={{ fontWeight: 600 }}>
                 {profile?.student_language
                   ? ({'english':'Inglês','spanish':'Espanhol','french':'Francês','portuguese':'Português','german':'Alemão','italian':'Italiano','mandarin':'Mandarim','japanese':'Japonês'} as Record<string,string>)[profile.student_language] ?? profile.student_language
@@ -159,7 +162,7 @@ export default async function StudentProfilePage() {
           {/* Fuso Horário */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '0.75rem' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Fuso Horário</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{t.profile.timezone}</div>
               <div style={{ fontWeight: 600 }}>
                 {profile?.timezone ? profile.timezone : (clientTz ? `${clientTz} (sincronizado)` : 'Não detectado')}
               </div>
@@ -177,7 +180,7 @@ export default async function StudentProfilePage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Válido até</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{t.profile.expiresAt}</div>
                   <div style={{ fontWeight: 600, color: isExpired || isUrgent ? 'var(--error)' : isWarning ? '#CA8A04' : 'var(--text-main)' }}>
                     {new Date(subscription.end_date).toLocaleDateString('pt-BR')}
                   </div>
@@ -207,19 +210,23 @@ export default async function StudentProfilePage() {
 
           {!isActive && (
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '1rem', lineHeight: 1.5 }}>
-              Para ativar seu acesso, entre em contato com a equipe EdAcademy.
+              {t.profile.contactToActivate}
             </p>
           )}
 
-          {/* Botão PIX — aparece quando admin_master configurou a chave */}
-          {pixSettings?.pix_key && (
+          {/* Botão PIX — mostrar se não for ativo ou se for ativo mas vencer em <= 7 dias */}
+          {pixSettings?.pix_key && (!isActive || (isActive && daysUntilExpiry !== null && daysUntilExpiry <= 7)) && (
             <div style={{ marginTop: '1.25rem' }}>
-              <PixPaymentModal pix={{
-                pix_key: pixSettings.pix_key,
-                pix_key_type: pixSettings.pix_key_type ?? null,
-                pix_beneficiary_name: pixSettings.pix_beneficiary_name ?? null,
-                pix_qr_code_url: pixSettings.pix_qr_code_url ?? null,
-              }} />
+              <PixPaymentModal 
+                pix={{
+                  pix_key: pixSettings.pix_key,
+                  pix_key_type: pixSettings.pix_key_type ?? null,
+                  pix_beneficiary_name: pixSettings.pix_beneficiary_name ?? null,
+                  pix_qr_code_url: pixSettings.pix_qr_code_url ?? null,
+                }} 
+                subscriptionStatus={subscription?.status}
+                isRenewal={isActive}
+              />
             </div>
           )}
         </section>
@@ -274,7 +281,12 @@ export default async function StudentProfilePage() {
         </div>
       </section>
 
-      {/* Atalho para Minhas Aulas */}
+        {/* Preferências — Tema e Idioma */}
+        <section style={{ marginBottom: '1.5rem' }}>
+          <PreferencesToggle />
+        </section>
+
+        {/* Atalho para Minhas Aulas */}
       <Link
         href="/dashboard/minhas-aulas"
         style={{

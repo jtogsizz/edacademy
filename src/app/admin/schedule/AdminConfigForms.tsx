@@ -12,7 +12,18 @@ export function AvailabilityForm() {
   const [day, setDay] = useState('1')
   const [start, setStart] = useState('07:00')
   const [end, setEnd] = useState('21:00')
+
+  // Horas permitidas: apenas horas fechadas (07–22 para início, 08–23 para fim)
+  const START_HOURS = Array.from({ length: 16 }, (_, i) => {
+    const h = (i + 7).toString().padStart(2, '0')
+    return `${h}:00`
+  }) // 07:00 .. 22:00
+  const END_HOURS = Array.from({ length: 16 }, (_, i) => {
+    const h = (i + 8).toString().padStart(2, '0')
+    return `${h}:00`
+  }) // 08:00 .. 23:00
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const endBeforeStart = end <= start
@@ -21,9 +32,15 @@ export function AvailabilityForm() {
     e.preventDefault()
     if (endBeforeStart) return
     setError(null)
+    setSuccess(false)
     startTransition(async () => {
       const res = await addAvailability(Number(day), start, end)
-      if (res?.error) setError(res.error)
+      if (res?.error) {
+        setError(res.error)
+      } else {
+        setSuccess(true)
+        setTimeout(() => setSuccess(false), 3000)
+      }
     })
   }
 
@@ -49,13 +66,16 @@ export function AvailabilityForm() {
         {/* Hora início */}
         <div className="avail-field">
           <label className="avail-label">Início</label>
-          <input
-            type="time"
+          <select
             value={start}
             onChange={e => setStart(e.target.value)}
             className="avail-input"
             required
-          />
+          >
+            {START_HOURS.map(h => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
         </div>
 
         {/* Hora fim */}
@@ -66,13 +86,16 @@ export function AvailabilityForm() {
               <span className="avail-time-warn">⚠ Fim deve ser maior que início</span>
             )}
           </label>
-          <input
-            type="time"
+          <select
             value={end}
             onChange={e => setEnd(e.target.value)}
             className={`avail-input ${endBeforeStart ? 'avail-input-error' : ''}`}
             required
-          />
+          >
+            {END_HOURS.map(h => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
         </div>
 
         {/* Botão */}
@@ -97,6 +120,10 @@ export function AvailabilityForm() {
 
       {error && (
         <div className="avail-error-msg">{error}</div>
+      )}
+
+      {success && (
+        <div className="avail-success-msg">Horário adicionado com sucesso.</div>
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `
@@ -192,6 +219,18 @@ export function AvailabilityForm() {
           font-size: 0.84rem;
           font-weight: 500;
         }
+        .avail-success-msg {
+          margin-top: 0.85rem;
+          padding: 0.65rem 1rem;
+          border-radius: 8px;
+          background: rgba(16,185,129,0.08);
+          border: 1px solid rgba(16,185,129,0.2);
+          color: var(--success, #059669);
+          font-size: 0.84rem;
+          font-weight: 500;
+          animation: avail-fade-in 0.2s ease;
+        }
+        @keyframes avail-fade-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes avail-spin { to { transform: rotate(360deg); } }
         @media (max-width: 700px) {
           .avail-form-grid {

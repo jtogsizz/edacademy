@@ -13,9 +13,10 @@ interface AffectedStudent {
 interface RemoveAvailabilityButtonProps {
   availabilityId: string
   displayTime: string // ex: "07:00 → 21:00" — só para contexto no confirm
+  onRemoved?: (id: string) => void
 }
 
-export function RemoveAvailabilityButton({ availabilityId, displayTime }: RemoveAvailabilityButtonProps) {
+export function RemoveAvailabilityButton({ availabilityId, displayTime, onRemoved }: RemoveAvailabilityButtonProps) {
   const [isPending, startTransition] = useTransition()
   const [confirmState, setConfirmState] = useState<{
     show: boolean
@@ -40,6 +41,7 @@ export function RemoveAvailabilityButton({ availabilityId, displayTime }: Remove
       }
 
       // Sem alunos afetados — removido diretamente (revalidatePath já aconteceu no server)
+      onRemoved?.(availabilityId)
     })
   }
 
@@ -56,6 +58,7 @@ export function RemoveAvailabilityButton({ availabilityId, displayTime }: Remove
         setError(res.error)
       } else {
         setConfirmState({ show: false, affectedStudents: [] })
+        onRemoved?.(availabilityId)
       }
     })
   }

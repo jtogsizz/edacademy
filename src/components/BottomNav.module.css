@@ -1,5 +1,5 @@
 .navSpacer {
-  height: 72px;
+  height: 80px;
 }
 
 .bottomNav {
@@ -14,6 +14,7 @@
   border-top: 1px solid rgba(229, 231, 235, 0.8);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.06);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .navList {
@@ -102,14 +103,44 @@
     right: auto;
     width: 100%;
     max-width: 500px;
-    border-radius: 20px; /* var(--radius-xl) equivalente */
+    border-radius: 20px;
     border: 1px solid rgba(229, 231, 235, 0.9);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
     background: rgba(255, 255, 255, 0.95);
   }
-  
+
   .navList {
     height: 68px;
     padding: 0 1rem;
+  }
+}
+
+/* Dark mode — aplica via seletor :global com html.theme-dark */
+:global(html.theme-dark) .bottomNav {
+  background: rgba(15, 23, 42, 0.94) !important;
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+:global(html.theme-dark) .navLink {
+  color: #64748b;
+}
+
+:global(html.theme-dark) .navLink:hover {
+  color: #94a3b8;
+}
+
+:global(html.theme-dark) .navLink.active {
+  color: #EA580C;
+}
+
+:global(html.theme-dark) .activeDot {
+  border-color: #0f172a;
+}
+
+@media (min-width: 768px) {
+  :global(html.theme-dark) .bottomNav {
+    background: rgba(15, 23, 42, 0.97) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
   }
 }

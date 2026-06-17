@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { utcToLocalTime } from '@/utils/agendaUtils'
 import { AvailabilityForm } from './AdminConfigForms'
-import { RemoveAvailabilityButton } from './RemoveAvailabilityButton'
+import AvailabilitySlotsClient from './AvailabilitySlotsClient'
 
 const DIAS = [
   'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
@@ -154,82 +154,10 @@ export default async function AdminSchedulePage() {
           )}
         </div>
 
-        {localAvail.length === 0 ? (
-          <EmptyState
-            icon="🗓"
-            title="Nenhum horário cadastrado"
-            sub="Adicione seu primeiro bloco de expediente usando o formulário acima."
-          />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {Array.from(availByDay.entries()).map(([dayNum, slots]) => (
-              <div key={dayNum} style={{
-                background: 'var(--bg-card, #fff)',
-                border: '1.5px solid var(--border)',
-                borderRadius: 14,
-                overflow: 'hidden',
-                boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
-                transition: 'box-shadow 0.15s',
-              }}
-              className="sched-day-card"
-              >
-                {/* Cabeçalho do dia */}
-                <div style={{
-                  padding: '0.75rem 1.25rem',
-                  borderBottom: '1px solid var(--border)',
-                  background: 'var(--bg-main)',
-                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, display: 'inline-block' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{DIAS[dayNum]}</span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                    {slots.length} {slots.length === 1 ? 'bloco' : 'blocos'}
-                  </span>
-                </div>
-
-                {/* Slots do dia */}
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {slots.map((av, idx) => (
-                    <div key={av.id} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '0.85rem 1.25rem',
-                      borderBottom: idx < slots.length - 1 ? '1px dashed var(--border)' : 'none',
-                      gap: '1rem',
-                    }}>
-                      {/* Horário */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <IconClock />
-                        <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
-                          {av.localStart}
-                        </span>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>→</span>
-                        <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
-                          {av.localEnd}
-                        </span>
-                        {idx > 0 && (
-                          <span style={{
-                            fontSize: '0.65rem', fontWeight: 700, padding: '0.15rem 0.5rem',
-                            borderRadius: 99, background: 'rgba(234,88,12,0.08)',
-                            color: 'var(--primary)', border: '1px solid rgba(234,88,12,0.15)',
-                            letterSpacing: '0.04em', textTransform: 'uppercase',
-                          }}>
-                            Bloco extra
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Remover */}
-                      <RemoveAvailabilityButton
-                        availabilityId={av.id}
-                        displayTime={`${av.localStart} → ${av.localEnd}`}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <AvailabilitySlotsClient
+          slots={localAvail}
+          totalCount={localAvail.length}
+        />
       </section>
 
       {/* ── AULAS FIXAS (LEITURA) ── */}

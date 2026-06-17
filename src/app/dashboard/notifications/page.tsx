@@ -29,6 +29,9 @@ export default async function NotificationsPage() {
     .from('notifications')
     .select('*')
     .eq('user_id', user.id)
+    // Notificações do tipo credits_empty foram removidas da lógica de negócio.
+    // Registros antigos permanecem no banco mas não devem aparecer para o aluno.
+    .not('metadata->>type', 'eq', 'credits_empty')
     .order('created_at', { ascending: false })
     .limit(100)
 

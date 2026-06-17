@@ -24,12 +24,12 @@ export default async function MeusEventosPage() {
   const availableEvents = allEvents?.filter((e: any) => !e.is_participating) || []
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', color: '#111827', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="app-shell" style={{ minHeight: '100vh', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'Inter, system-ui, sans-serif' }}>
       
       {/* HEADER COMPACTO SaaS */}
       <header style={{ 
-        backgroundColor: '#fff', 
-        borderBottom: '1px solid #e5e7eb',
+        backgroundColor: 'var(--bg-card)', 
+        borderBottom: '1px solid var(--border)',
         padding: '1rem 2rem',
         position: 'sticky',
         top: 0,
@@ -49,18 +49,18 @@ export default async function MeusEventosPage() {
         <div style={{ marginBottom: '2.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
             <div>
-              <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: '#111827', letterSpacing: '-0.025em', marginBottom: '0.25rem' }}>
+              <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.025em', marginBottom: '0.25rem' }}>
                 Olá, {profile?.full_name?.split(' ')[0] || 'Estudante'}
               </h1>
-              <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>Gerencie seus eventos e acompanhe sua jornada na EdAcademy.</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Gerencie seus eventos e acompanhe sua jornada na EdAcademy.</p>
             </div>
           </div>
 
           {/* BANNER HORIZONTAL (CONTA INATIVA) */}
           {profile?.is_active === false && (
             <div style={{ 
-              backgroundColor: '#fff', 
-              border: '1px solid #e5e7eb',
+              backgroundColor: 'var(--bg-card)', 
+              border: '1px solid var(--border)',
               borderLeft: '4px solid var(--primary)',
               borderRadius: '12px',
               padding: '1.25rem 1.5rem',
@@ -73,8 +73,8 @@ export default async function MeusEventosPage() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Sua conta está inativa</h4>
-                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Sua conta está inativa</h4>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                     Para liberar o acesso completo ao Plano do Curso, entre em contato com a Melissa pelo WhatsApp.
                   </p>
                 </div>
@@ -98,16 +98,16 @@ export default async function MeusEventosPage() {
           <div style={{ gridColumn: 'span 12', lg: 'span 8' } as any}>
             <section>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#111827' }}>Aulas Abertas Disponíveis</h3>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-main)' }}>Aulas Abertas Disponíveis</h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {availableEvents.length} eventos encontrados
                 </span>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {availableEvents.length === 0 ? (
-                  <div style={{ padding: '4rem 2rem', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', textAlign: 'center' }}>
-                    <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>Nenhum novo evento disponível no momento.</p>
+                  <div style={{ padding: '4rem 2rem', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', textAlign: 'center' }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Nenhum novo evento disponível no momento.</p>
                   </div>
                 ) : (
                   availableEvents.map((event: any) => (
@@ -130,8 +130,8 @@ export default async function MeusEventosPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               
               {/* Minhas Inscrições */}
-              <section style={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: '1rem' }}>Minhas Inscrições</h3>
+              <section style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '1rem' }}>Minhas Inscrições</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {enrolledEvents.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '1rem 0' }}>
@@ -139,7 +139,7 @@ export default async function MeusEventosPage() {
                     </div>
                   ) : (
                     enrolledEvents.map((event: any) => (
-                      <div key={event.id} style={{ padding: '0.75rem', border: '1px solid #f3f4f6', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+                      <div key={event.id} style={{ padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--bg-main)' }}>
                         <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.9rem', fontWeight: 600 }}>{event.title}</h4>
                         <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>
                           Status: <span style={{ color: 'var(--success)', fontWeight: 600 }}>Inscrito</span>

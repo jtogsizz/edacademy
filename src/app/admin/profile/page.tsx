@@ -8,6 +8,7 @@ import Link from 'next/link'
 import ProfileEditContainer from '@/components/ProfileEditContainer'
 import PixConfigSection from './PixConfigSection'
 import StudentManageMenu from './StudentManageMenu'
+import PreferencesToggle from '@/components/PreferencesToggle'
 import { updateProfile } from '@/app/dashboard/actions'
 import { unstable_noStore as noStore } from 'next/cache'
 import { changeUserRole, setTeacherLanguage, setStudentLanguage, updatePixConfig } from '@/app/admin/actions'
@@ -68,7 +69,9 @@ export default async function AdminProfilePage(props: { searchParams?: Promise<a
   if (sp.q) {
     const q = String(sp.q).toLowerCase()
     filteredStudents = filteredStudents.filter(s =>
-      s.full_name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q)
+      s.full_name?.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.id?.toLowerCase() === q  // fallback: busca exata por UUID
     )
   }
   // 2. Filtro Status
@@ -130,9 +133,6 @@ export default async function AdminProfilePage(props: { searchParams?: Promise<a
   const hasFilters = !!(sp.q || sp.lang || sp.sort || sp.status)
   const today = new Date(); today.setHours(0, 0, 0, 0)
 
-  const FINANCEIRO_ROLES = ['admin_master', 'suporte', 'dev']
-  const canSeeFinanceiro = FINANCEIRO_ROLES.includes(profile?.role)
-
   return (
     <div className="container" style={{ padding: '2rem 1.5rem', paddingBottom: '8rem', maxWidth: '1280px' }}>
 
@@ -145,19 +145,6 @@ export default async function AdminProfilePage(props: { searchParams?: Promise<a
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {canSeeFinanceiro && (
-            <Link href="/admin/financeiro" style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-              background: 'var(--primary-gradient)', color: '#fff',
-              padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)',
-              fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none',
-              boxShadow: '0 2px 8px rgba(234,88,12,0.2)',
-              transition: 'all 0.2s',
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-              Painel Financeiro
-            </Link>
-          )}
           <LogoutButton />
         </div>
       </header>
@@ -196,6 +183,11 @@ export default async function AdminProfilePage(props: { searchParams?: Promise<a
             )}
           </div>
         </div>
+      </section>
+
+      {/* ── PREFERÊNCIAS — Tema e Idioma ── */}
+      <section style={{ marginBottom: '2rem' }}>
+        <PreferencesToggle />
       </section>
 
       {/* ── GESTÃO DE PROFESSORES (admin_master + dev) ── */}

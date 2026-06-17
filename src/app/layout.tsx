@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 import FaqPopout from '@/components/FaqPopout'
 import UserProfileDrawer from '@/components/UserProfileDrawer'
+import ThemeScript from '@/components/ThemeScript'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { LocaleProvider } from '@/contexts/LocaleContext'
 import { Suspense } from 'react'
 import { getAppUrl } from '@/utils/url'
 
@@ -24,21 +27,26 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <main style={{ flex: 1 }}>
-          {children}
-        </main>
+        <ThemeProvider>
+          <LocaleProvider>
+            <main style={{ flex: 1 }}>
+              {children}
+            </main>
 
-        {/* Links Fixos Sociais - Canto Inferior Esquerdo */}
-        <div style={{ position: 'fixed', bottom: '80px', left: '16px', zIndex: 99, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        {/* Links Fixos Sociais - Canto Inferior Esquerdo — isolados do dark mode interno */}
+        <div className="public-social-links" style={{ position: 'fixed', bottom: '80px', left: '16px', zIndex: 99, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           <a 
             href="https://www.youtube.com/@nomadebilingue" 
             target="_blank" 
             rel="noopener noreferrer"
             style={{ 
               fontSize: '0.8rem', 
-              color: 'var(--text-main)', 
+              color: '#374151', 
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
@@ -46,7 +54,7 @@ export default function RootLayout({
               backgroundColor: 'rgba(255, 255, 255, 0.9)',
               padding: '0.4rem 0.8rem',
               borderRadius: '20px',
-              border: '1px solid var(--border)',
+              border: '1px solid rgba(229,231,235,0.8)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               backdropFilter: 'blur(4px)'
             }}
@@ -61,7 +69,7 @@ export default function RootLayout({
             rel="noopener noreferrer"
             style={{ 
               fontSize: '0.8rem', 
-              color: 'var(--text-main)', 
+              color: '#374151', 
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
@@ -69,7 +77,7 @@ export default function RootLayout({
               backgroundColor: 'rgba(255, 255, 255, 0.9)',
               padding: '0.4rem 0.8rem',
               borderRadius: '20px',
-              border: '1px solid var(--border)',
+              border: '1px solid rgba(229,231,235,0.8)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               backdropFilter: 'blur(4px)'
             }}
@@ -79,13 +87,15 @@ export default function RootLayout({
           </a>
         </div>
 
-        {/* Global FAQ Popout */}
-        <FaqPopout />
+            {/* Global FAQ Popout */}
+            <FaqPopout />
 
-        {/* Global User Profile Drawer */}
-        <Suspense fallback={null}>
-          <UserProfileDrawer />
-        </Suspense>
+            {/* Global User Profile Drawer */}
+            <Suspense fallback={null}>
+              <UserProfileDrawer />
+            </Suspense>
+          </LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

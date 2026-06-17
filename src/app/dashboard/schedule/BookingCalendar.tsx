@@ -135,11 +135,11 @@ export default function BookingCalendar({
                 </div>
               )}
               {!rescheduleId && (
-                <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: replacementCredits > 0 ? 'var(--text-muted)' : '#CA8A04' }}>
-                  <span style={{ fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '99px', backgroundColor: replacementCredits > 0 ? 'rgba(52,211,153,0.1)' : 'rgba(234,179,8,0.1)', color: replacementCredits > 0 ? '#059669' : '#CA8A04', border: `1px solid ${replacementCredits > 0 ? 'rgba(52,211,153,0.3)' : 'rgba(234,179,8,0.3)'}`, fontSize: '0.75rem' }}>
+                <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  <span style={{ fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '99px', backgroundColor: replacementCredits > 0 ? 'rgba(52,211,153,0.1)' : 'rgba(148,163,184,0.1)', color: replacementCredits > 0 ? '#059669' : 'var(--text-muted)', border: `1px solid ${replacementCredits > 0 ? 'rgba(52,211,153,0.3)' : 'rgba(148,163,184,0.2)'}`, fontSize: '0.75rem' }}>
                     {replacementCredits} crédito{replacementCredits !== 1 ? 's' : ''}
                   </span>
-                  {replacementCredits === 0 ? 'Nenhum crédito disponível para aula extra' : 'disponível para aula extra'}
+                  {replacementCredits === 0 ? 'sem créditos de reposição no momento' : 'disponível para aula extra'}
                 </div>
               )}
             </div>

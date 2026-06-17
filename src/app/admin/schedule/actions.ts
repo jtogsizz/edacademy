@@ -19,6 +19,18 @@ export async function addAvailability(dayOfWeek: number, startTime: string, endT
   const teacherContext = await getAuthTeacher(supabase)
   if (!teacherContext) return { error: 'Não autorizado' }
 
+  // Validação: apenas horários fechados (minutos = 00)
+  const startMinutes = Number(startTime.split(':')[1] ?? -1)
+  const endMinutes   = Number(endTime.split(':')[1]   ?? -1)
+  if (startMinutes !== 0 || endMinutes !== 0) {
+    return { error: 'Use apenas horários fechados, como 07:00 ou 14:00.' }
+  }
+
+  // Validação: fim deve ser maior que início
+  if (endTime <= startTime) {
+    return { error: 'O horário de fim deve ser maior que o horário de início.' }
+  }
+
   const { cookies } = await import('next/headers')
   const cookieStore = await cookies()
   const clientTz = cookieStore.get('client_tz')?.value

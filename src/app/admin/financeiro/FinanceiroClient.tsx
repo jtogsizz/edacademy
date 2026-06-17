@@ -123,8 +123,14 @@ export default function FinanceiroClient({
 
       if (type === 'confirmPayment') {
         const { confirmPayment } = await import('./actions')
-        await confirmPayment(studentId)
-        
+        const res = await confirmPayment(studentId)
+
+        // Verificar erro de duplicidade ou qualquer retorno de falha
+        if (res && !res.success) {
+          setModalError(res.error ?? 'Ocorreu um erro. Tente novamente.')
+          return
+        }
+
         // Optimistic UI pós-sucesso
         const st = localPending.find(s => s.id === studentId)
         if (st) {
@@ -147,7 +153,13 @@ export default function FinanceiroClient({
 
       } else if (type === 'renewSubscription') {
         const { renewSubscription } = await import('./actions')
-        await renewSubscription(studentId)
+        const res = await renewSubscription(studentId)
+
+        // Verificar erro de duplicidade ou qualquer retorno de falha
+        if (res && !res.success) {
+          setModalError(res.error ?? 'Ocorreu um erro. Tente novamente.')
+          return
+        }
 
         // Optimistic UI pós-sucesso
         setLocalActive(p => p.map(s => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -28,6 +28,17 @@ export default function ChatSidebar({ myUserId, myRole, basePath }: ChatSidebarP
   const [search, setSearch] = useState('')
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(false)
+  const [unreadMap, setUnreadMap] = useState<Record<string, boolean>>({})
+
+  const activePartnerIdRef = useRef(activePartnerId)
+  
+  // Atualiza a ref e reseta bolinha não lida ao abrir o chat
+  useEffect(() => {
+    activePartnerIdRef.current = activePartnerId
+    if (activePartnerId) {
+      setUnreadMap(prev => ({ ...prev, [activePartnerId]: false }))
+    }
+  }, [activePartnerId])
 
   // O aluno pode buscar admin, admin_master, suporte, dev.
   // Staff pode buscar qualquer um.
@@ -55,6 +66,66 @@ export default function ChatSidebar({ myUserId, myRole, basePath }: ChatSidebarP
 
     return () => clearTimeout(timer)
   }, [search, myRole, myUserId])
+
+  // Realtime
+  useEffect(() => {
+    if (!myUserId) return
+    const supabase = createClient()
+
+    // 1. Canal para mensagens recebidas (Atualiza ordem e marca não lida)
+    const channelReceived = supabase.channel('sidebar-received')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${myUserId}` },
+        (payload) => {
+          const newMsg = payload.new
+          const senderId = newMsg.sender_id
+
+          setUsers(prev => {
+            const existing = prev.find(u => u.id === senderId)
+            if (!existing) return prev
+            
+            const updatedProfile = { ...existing, last_message: newMsg.content, last_message_time: newMsg.created_at }
+            const filtered = prev.filter(u => u.id !== senderId)
+            return [updatedProfile, ...filtered] // Move para o topo
+          })
+
+          const currentActive = activePartnerIdRef.current
+          if (currentActive !== senderId) {
+            setUnreadMap(prev => ({ ...prev, [senderId]: true }))
+          }
+        }
+      )
+      .subscribe()
+
+    // 2. Canal para mensagens enviadas (Reflete envio por outra aba/celular)
+    const channelSent = supabase.channel('sidebar-sent')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${myUserId}` },
+        (payload) => {
+          const newMsg = payload.new
+          const receiverId = newMsg.receiver_id
+
+          setUsers(prev => {
+            const existing = prev.find(u => u.id === receiverId)
+            if (!existing) return prev
+            
+            const updatedProfile = { ...existing, last_message: newMsg.content, last_message_time: newMsg.created_at }
+            const filtered = prev.filter(u => u.id !== receiverId)
+            return [updatedProfile, ...filtered]
+          })
+          
+          setUnreadMap(prev => ({ ...prev, [receiverId]: false }))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channelReceived)
+      supabase.removeChannel(channelSent)
+    }
+  }, [myUserId])
 
   return (
     <aside className="chat-sidebar" style={{ width: '350px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card)' }}>
@@ -96,6 +167,7 @@ export default function ChatSidebar({ myUserId, myRole, basePath }: ChatSidebarP
           {users.map((s) => {
             const avatar = s.avatar_url || "/default-avatar.svg"
             const isActive = activePartnerId === s.id
+            const isUnread = unreadMap[s.id]
 
             return (
               <li key={s.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isActive ? 'var(--bg-main)' : 'transparent' }}>
@@ -105,10 +177,13 @@ export default function ChatSidebar({ myUserId, myRole, basePath }: ChatSidebarP
                     <div style={{ position: 'absolute', bottom: 0, right: 0, width: '10px', height: '10px', backgroundColor: 'var(--success)', borderRadius: '50%', border: '2px solid var(--bg-card)' }}></div>
                   </Link>
                   <Link href={`${basePath}/${s.id}`} style={{ flex: 1, overflow: 'hidden', color: 'inherit', textDecoration: 'none', marginLeft: '1rem' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {s.full_name}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.1rem' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: isUnread ? 'var(--text-main)' : 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {s.full_name}
+                      </div>
+                      {isUnread && <div style={{ width: '8px', height: '8px', backgroundColor: 'var(--primary)', borderRadius: '50%', flexShrink: 0 }}></div>}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: '0.75rem', color: isUnread ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: isUnread ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {s.last_message || 'Toque para iniciar conversa'}
                     </div>
                   </Link>

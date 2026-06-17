@@ -1,6 +1,7 @@
 import BottomNav from "@/components/BottomNav";
 import { createClient } from '@/utils/supabase/server'
 import TimezoneDetector from '@/components/TimezoneDetector'
+import PreferencesLoader from '@/components/PreferencesLoader'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({
@@ -16,7 +17,7 @@ export default async function DashboardLayout({
 
   // Verifica se a conta está sem whatsapp (perfil incompleto)
   // E também verifica se a conta está inativa
-  const { data: profile } = await supabase.from('profiles').select('role, is_active, whatsapp_number').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role, is_active, whatsapp_number, ui_theme, ui_locale').eq('id', user.id).single()
   
   if (profile && !profile.whatsapp_number) {
     redirect('/onboarding')
@@ -28,7 +29,8 @@ export default async function DashboardLayout({
 
 
   return (
-    <div>
+    <div className="app-shell">
+      <PreferencesLoader initialTheme={profile?.ui_theme} initialLocale={profile?.ui_locale} />
       <TimezoneDetector />
       {children}
       <BottomNav role={profile?.role || 'student'} />

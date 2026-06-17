@@ -572,3 +572,306 @@ h1, h2, h3, h4, h5, h6 {
   50% { box-shadow: 0 0 0 4px rgba(234,88,12,0); }
 }
 
+
+
+/* ══════════════════════════════════════════════════════════════
+   APP-SHELL BASE — garante background correto em qualquer tema
+   ══════════════════════════════════════════════════════════════ */
+
+.app-shell {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  /* Garante que conteúdo nunca fica atrás do BottomNav */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Container dos links sociais públicos — nunca afetado pelo dark mode */
+html.theme-dark .public-social-links a {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  color: #374151 !important;
+  border-color: rgba(229, 231, 235, 0.8) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DARK MODE — Escopo: apenas dentro de .app-shell
+   A landing page não tem .app-shell e NUNCA é afetada.
+   ══════════════════════════════════════════════════════════════ */
+
+html.theme-dark .app-shell {
+  /* Backgrounds elegantes — não preto puro */
+  --bg-main:   #0f172a;
+  --bg-card:   #1e293b;
+  --bg-hover:  #1e2d3d;
+
+  /* Textos com hierarquia clara */
+  --text-main:  #f1f5f9;
+  --text-muted: #94a3b8;
+
+  /* Bordas sutis para dark */
+  --border: rgba(255, 255, 255, 0.08);
+
+  /* Sombras escuras profundas */
+  --shadow-sm:    0 2px 4px rgba(0,0,0,0.4);
+  --shadow-md:    0 4px 12px rgba(0,0,0,0.45);
+  --shadow-lg:    0 10px 30px rgba(0,0,0,0.55);
+  --shadow-hover: 0 20px 40px rgba(0,0,0,0.6);
+
+  /* Laranja da marca — 100% preservado */
+  --primary:          #EA580C;
+  --primary-hover:    #C2410C;
+  --primary-light:    rgba(234, 88, 12, 0.18);
+  --primary-gradient:       linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+  --primary-gradient-hover: linear-gradient(135deg, #EA580C 0%, #C2410C 100%);
+  --ring: rgba(234, 88, 12, 0.5);
+
+  /* Feedback ajustado para dark */
+  --success:    #34d399;
+  --success-bg: rgba(52, 211, 153, 0.12);
+  --error:      #f87171;
+  --error-bg:   rgba(248, 113, 113, 0.12);
+  --warning:    #fbbf24;
+}
+
+/* ── Background e cor base da shell ── */
+html.theme-dark .app-shell {
+  background-color: #0f172a !important;
+  color: #f1f5f9;
+}
+
+/* ── Todos os elementos com background branco/cinza claro hardcoded ── */
+html.theme-dark .app-shell .card,
+html.theme-dark .app-shell section.card,
+html.theme-dark .app-shell .stat-card,
+html.theme-dark .app-shell .data-table-wrap,
+html.theme-dark .app-shell .internal-section,
+html.theme-dark .app-shell .quick-action {
+  background: #1e293b !important;
+  background-color: #1e293b !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Containers internos com bg hardcoded (#fff, #f9fafb, #ffffff) ── */
+html.theme-dark .app-shell [style*="background: #"] {
+  /* Não podemos sobrescrever tudo com seletor de atributo — cobrimos as classes */
+}
+
+html.theme-dark .app-shell header,
+html.theme-dark .app-shell .internal-header {
+  background-color: transparent !important;
+}
+
+html.theme-dark .app-shell h1,
+html.theme-dark .app-shell h2,
+html.theme-dark .app-shell h3,
+html.theme-dark .app-shell h4,
+html.theme-dark .app-shell h5,
+html.theme-dark .app-shell h6,
+html.theme-dark .app-shell .internal-title {
+  color: #f1f5f9 !important;
+}
+
+html.theme-dark .app-shell p,
+html.theme-dark .app-shell span:not(.badge):not(.alert-badge):not(.activeDot),
+html.theme-dark .app-shell div:not([class*="badge"]):not([class*="alert"]):not([class*="btn"]):not([class*="active"]) {
+  color: inherit;
+}
+
+html.theme-dark .app-shell .internal-subtitle,
+html.theme-dark .app-shell .internal-breadcrumb,
+html.theme-dark .app-shell .stat-card-label {
+  color: #94a3b8 !important;
+}
+
+/* ── Textos principais dentro de containers ── */
+html.theme-dark .app-shell .stat-card-value {
+  color: #f1f5f9 !important;
+}
+
+/* ── Seção label ── */
+html.theme-dark .app-shell .section-label {
+  color: #94a3b8;
+}
+html.theme-dark .app-shell .section-label::after {
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Inputs, selects, textareas ── */
+html.theme-dark .app-shell input,
+html.theme-dark .app-shell select,
+html.theme-dark .app-shell textarea {
+  background: #1e293b !important;
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+html.theme-dark .app-shell input::placeholder,
+html.theme-dark .app-shell textarea::placeholder {
+  color: #64748b !important;
+}
+
+html.theme-dark .app-shell input:focus,
+html.theme-dark .app-shell select:focus,
+html.theme-dark .app-shell textarea:focus {
+  background-color: #253347 !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.2) !important;
+}
+
+/* ── Botão outline no dark ── */
+html.theme-dark .app-shell .btn-outline {
+  background-color: rgba(255,255,255,0.05) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #e2e8f0 !important;
+}
+
+html.theme-dark .app-shell .btn-outline:hover {
+  background-color: rgba(255,255,255,0.1) !important;
+  border-color: rgba(255,255,255,0.25) !important;
+  color: #f1f5f9 !important;
+}
+
+/* ── Tabela de dados ── */
+html.theme-dark .app-shell .data-table-header,
+html.theme-dark .app-shell .internal-section-header {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+
+html.theme-dark .app-shell .data-table-title {
+  color: #e2e8f0 !important;
+}
+
+html.theme-dark .app-shell .data-table th {
+  background-color: rgba(15, 23, 42, 0.7) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+
+html.theme-dark .app-shell .data-table td {
+  color: #cbd5e1 !important;
+  border-color: rgba(255,255,255,0.05) !important;
+}
+
+html.theme-dark .app-shell .data-table tbody tr:hover {
+  background-color: rgba(255,255,255,0.04) !important;
+}
+
+/* ── Skeleton loader ── */
+html.theme-dark .app-shell .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%) !important;
+  background-size: 200% auto !important;
+}
+
+/* ── Quick action card ── */
+html.theme-dark .app-shell .quick-action {
+  color: #e2e8f0 !important;
+}
+html.theme-dark .app-shell .quick-action:hover {
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+html.theme-dark .app-shell .quick-action-icon {
+  background: rgba(234, 88, 12, 0.15) !important;
+}
+
+/* ── Today card (já usa orange, manter) ── */
+html.theme-dark .app-shell .today-card {
+  /* mantém o gradiente laranja */
+}
+
+/* ── Chat bubbles ── */
+html.theme-dark .app-shell .chat-bubble-received {
+  background-color: #1e293b !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  color: #e2e8f0 !important;
+}
+
+/* ── Notif item ── */
+html.theme-dark .app-shell .notif-item {
+  border-color: rgba(255,255,255,0.07) !important;
+}
+
+/* ── Meus-eventos: header branco hardcoded ── */
+html.theme-dark .app-shell header[style] {
+  background-color: #1e293b !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Seção de inscrições / cards brancos no meus-eventos ── */
+html.theme-dark .app-shell section[style*="background"],
+html.theme-dark .app-shell section[style*="#fff"],
+html.theme-dark .app-shell section[style*="white"],
+html.theme-dark .app-shell div[style*="background-color: #fff"],
+html.theme-dark .app-shell div[style*="background: #fff"],
+html.theme-dark .app-shell div[style*="backgroundColor: '#fff'"],
+html.theme-dark .app-shell div[style*="background-color: white"],
+html.theme-dark .app-shell div[style*="background-color: #ffffff"],
+html.theme-dark .app-shell div[style*="background-color: #f9fafb"],
+html.theme-dark .app-shell div[style*="background-color: #F9FAFB"] {
+  background-color: #1e293b !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Modais e painéis flutuantes ── */
+html.theme-dark .app-shell div[style*="background: #fff"],
+html.theme-dark .app-shell div[style*="background:#fff"],
+html.theme-dark div[style*="background: #fff"][style*="border-radius: var(--radius-lg)"],
+html.theme-dark div[style*="background: #fff"][style*="border-radius: var(--radius-xl)"] {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* ── Tab bar no financeiro ── */
+html.theme-dark .app-shell div[style*="background: #FFFFFF"],
+html.theme-dark .app-shell div[style*="background-color: #FFFFFF"] {
+  background: #1e293b !important;
+  background-color: #1e293b !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Footer meus-eventos ── */
+html.theme-dark .app-shell footer {
+  background-color: transparent !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  color: #64748b !important;
+}
+
+/* ── Badges mantêm suas cores semânticas ── */
+html.theme-dark .app-shell .badge-active   { background-color: rgba(52,211,153,0.15) !important; color: #34d399 !important; }
+html.theme-dark .app-shell .badge-inactive { background-color: rgba(100,116,139,0.2) !important; color: #94a3b8 !important; }
+html.theme-dark .app-shell .badge-pending  { background-color: rgba(251,191,36,0.15) !important; color: #fbbf24 !important; }
+
+html.theme-dark .app-shell .alert-badge-success { background: rgba(52,211,153,0.12)  !important; color: #34d399 !important; border-color: rgba(52,211,153,0.25)  !important; }
+html.theme-dark .app-shell .alert-badge-error   { background: rgba(248,113,113,0.12) !important; color: #f87171 !important; border-color: rgba(248,113,113,0.25) !important; }
+html.theme-dark .app-shell .alert-badge-warning { background: rgba(251,191,36,0.12)  !important; color: #fbbf24 !important; border-color: rgba(251,191,36,0.25)  !important; }
+html.theme-dark .app-shell .alert-badge-info    { background: rgba(96,165,250,0.12)  !important; color: #60a5fa !important; border-color: rgba(96,165,250,0.25)  !important; }
+html.theme-dark .app-shell .alert-badge-neutral { background: rgba(148,163,184,0.12) !important; color: #94a3b8 !important; border-color: rgba(148,163,184,0.2)  !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   BOTTOM NAV — Dark Mode (via :global para CSS Modules)
+   ══════════════════════════════════════════════════════════════ */
+
+html.theme-dark .app-shell nav[aria-label="Navegação principal"] {
+  background: rgba(15, 23, 42, 0.92) !important;
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.35) !important;
+}
+
+/* link inativo no dark nav */
+html.theme-dark .app-shell nav[aria-label="Navegação principal"] a {
+  color: #64748b !important;
+}
+html.theme-dark .app-shell nav[aria-label="Navegação principal"] a:hover {
+  color: #94a3b8 !important;
+}
+/* link ativo preserva laranja */
+html.theme-dark .app-shell nav[aria-label="Navegação principal"] a[aria-current="page"] {
+  color: #EA580C !important;
+}
+
+/* ── Dot de active no dark ── */
+html.theme-dark .app-shell nav[aria-label="Navegação principal"] span[class*="activeDot"] {
+  border-color: #0f172a !important;
+}

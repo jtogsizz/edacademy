@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, MessageCircle, User, CalendarDays, BarChart2 } from "lucide-react";
 import styles from "./BottomNav.module.css";
+import { useTranslation } from "@/i18n";
 
 interface NavItem {
   name: string
@@ -13,23 +14,24 @@ interface NavItem {
 
 export default function BottomNav({ role }: { role?: string }) {
   const pathname = usePathname();
+  const t = useTranslation();
 
   const isAdminArea = role === 'admin' || role === 'admin_master' || role === 'suporte' || role === 'dev' || pathname?.startsWith('/admin');
   const isFinanceiroRole = role === 'admin_master' || role === 'suporte' || role === 'dev';
 
   const adminItems: NavItem[] = [
-    { name: 'Dashboard',    href: '/dashboard',           icon: Home },
-    { name: 'Minhas Aulas', href: '/admin/agenda',        icon: CalendarDays },
-    { name: 'Chat',         href: '/admin/chat',          icon: MessageCircle },
-    ...(isFinanceiroRole ? [{ name: 'Financeiro', href: '/admin/financeiro', icon: BarChart2 }] : []),
-    { name: 'Perfil',       href: '/admin/profile',       icon: User },
+    { name: t.nav.dashboard,    href: '/dashboard',           icon: Home },
+    { name: t.nav.myClasses,    href: '/admin/agenda',        icon: CalendarDays },
+    { name: t.nav.chat,         href: '/admin/chat',          icon: MessageCircle },
+    ...(isFinanceiroRole ? [{ name: t.nav.financial, href: '/admin/financeiro', icon: BarChart2 }] : []),
+    { name: t.nav.profile,      href: '/admin/profile',       icon: User },
   ]
 
   const studentItems: NavItem[] = [
-    { name: 'Início',       href: '/dashboard',              icon: Home },
-    { name: 'Minhas Aulas', href: '/dashboard/minhas-aulas', icon: CalendarDays },
-    { name: 'Chat',         href: '/dashboard/chat',         icon: MessageCircle },
-    { name: 'Perfil',       href: '/dashboard/profile',      icon: User },
+    { name: t.nav.home,         href: '/dashboard',              icon: Home },
+    { name: t.nav.myClasses,    href: '/dashboard/minhas-aulas', icon: CalendarDays },
+    { name: t.nav.chat,         href: '/dashboard/chat',         icon: MessageCircle },
+    { name: t.nav.profile,      href: '/dashboard/profile',      icon: User },
   ]
 
   const navItems = isAdminArea ? adminItems : studentItems
@@ -46,7 +48,7 @@ export default function BottomNav({ role }: { role?: string }) {
               : pathname?.startsWith(item.href)
 
             return (
-              <li key={item.name} className={styles.navItem}>
+              <li key={item.href} className={styles.navItem}>
                 <Link
                   href={item.href}
                   className={`${styles.navLink} ${isActive ? styles.active : ""}`}

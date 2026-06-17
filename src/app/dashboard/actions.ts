@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { checkRateLimit, RATE_LIMIT_MESSAGES } from '@/utils/rate-limit'
 
@@ -237,5 +237,125 @@ export async function addComment(postId: string, content: string) {
   if (error) return { error: error.message }
 
   revalidatePath('/dashboard')
+  return { success: true }
+}
+
+/**
+ * Marca o pagamento do aluno como pending_confirmation.
+ */
+export async function markPaymentPending() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado' }
+
+  // 1. Buscar a assinatura atual do aluno
+  const { data: sub, error: fetchErr } = await supabase
+    .from('subscriptions')
+    .select('status, end_date')
+    .eq('student_id', user.id)
+    .single()
+
+  if (fetchErr && fetchErr.code !== 'PGRST116') {
+    return { error: 'Erro ao buscar assinatura.' }
+  }
+
+  // DEBUG LOG
+  console.log('[DEBUG markPaymentPending] user_id:', user.id)
+  console.log('[DEBUG markPaymentPending] sub found:', sub)
+
+  // 2. Validação de regras de negócio
+  if (sub) {
+    if (sub.status === 'pending_confirmation') {
+      console.log('[DEBUG markPaymentPending] Bloqueado: Já pendente')
+      return { success: false }
+    }
+
+    if (sub.status === 'active') {
+      if (!sub.end_date) {
+        console.log('[DEBUG markPaymentPending] Bloqueado: Ativa sem end_date')
+        return { error: 'Assinatura ativa não possui data de vencimento.' }
+      }
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const expiry = new Date(sub.end_date)
+      expiry.setHours(0, 0, 0, 0)
+      const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+      console.log('[DEBUG markPaymentPending] diasRestantes:', daysUntilExpiry)
+
+      if (daysUntilExpiry > 7) {
+        console.log('[DEBUG markPaymentPending] Bloqueado: > 7 dias')
+        return { error: 'O plano ainda tem mais de 7 dias de validade.' }
+      }
+    }
+  }
+
+  // 3. Atualizar ou inserir sem usar upsert
+  const adminClient = await createAdminClient()
+  if (sub) {
+    // Atualizar registro existente
+    console.log('[DEBUG markPaymentPending] Executando update...')
+    const { error, count } = await adminClient
+      .from('subscriptions')
+      .update({ 
+        status: 'pending_confirmation',
+        updated_at: new Date().toISOString()
+      })
+      .eq('student_id', user.id)
+      .select()
+
+    console.log('[DEBUG markPaymentPending] update result:', { error, count: count || (error ? null : 'sucesso, select retornou dados') })
+
+    if (error) return { error: error.message }
+  } else {
+    // Inserir novo registro se não existia
+    console.log('[DEBUG markPaymentPending] Executando insert...')
+    const { error } = await adminClient
+      .from('subscriptions')
+      .insert({ 
+        student_id: user.id,
+        status: 'pending_confirmation',
+        updated_at: new Date().toISOString()
+      })
+
+    if (error) {
+      console.log('[DEBUG markPaymentPending] Insert error:', error.message)
+      return { error: error.message }
+    }
+  }
+
+  // Verificar update real no banco (sanity check)
+  const { data: finalSub } = await adminClient
+    .from('subscriptions')
+    .select('status')
+    .eq('student_id', user.id)
+    .single()
+
+  console.log('[DEBUG markPaymentPending] status após update:', finalSub?.status)
+
+  if (finalSub?.status !== 'pending_confirmation') {
+    return { error: 'Falha ao atualizar o status no banco de dados. Tente novamente.' }
+  }
+
+  revalidatePath('/dashboard/profile')
+  revalidatePath('/dashboard')
+  revalidatePath('/admin/financeiro')
+  return { success: true }
+}
+
+/**
+ * Salva as preferências de UI do usuário (tema e idioma).
+ */
+export async function saveUserPreferences(theme: string, locale: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ ui_theme: theme, ui_locale: locale })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
   return { success: true }
 }

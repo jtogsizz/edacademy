@@ -8,6 +8,8 @@ import MeetLinkButton from '@/components/MeetLinkButton'
 import { unstable_noStore as noStore } from 'next/cache'
 import { cookies } from 'next/headers'
 import InternalPageHeader from '@/components/InternalPageHeader'
+import { getTranslation } from '@/i18n/server'
+import UpcomingClassesClient from './UpcomingClassesClient'
 
 export const metadata = { title: 'Minhas Aulas · EdAcademy' }
 
@@ -16,6 +18,7 @@ export default async function MinhasAulasPage() {
   const supabase = await createClient()
   const cookieStore = await cookies()
   const clientTz = cookieStore.get('client_tz')?.value
+  const t = await getTranslation()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -83,9 +86,9 @@ export default async function MinhasAulasPage() {
     <div className="container" style={{ padding: '2rem 1.5rem', paddingBottom: '6rem', maxWidth: '900px' }}>
 
       <InternalPageHeader
-        title="Minhas Aulas"
-        subtitle="Próximas aulas agendadas e histórico completo"
-        breadcrumb={[{ label: 'Início', href: '/dashboard' }, { label: 'Minhas Aulas' }]}
+        title={t.myClassesPage.title}
+        subtitle={t.myClassesPage.subtitle}
+        breadcrumb={[{ label: t.nav.dashboard, href: '/dashboard' }, { label: t.myClassesPage.title }]}
       />
 
         {/* ===== EVENTOS ===== */}
@@ -161,90 +164,12 @@ export default async function MinhasAulasPage() {
           <span style={{ color: 'var(--primary)' }}>●</span> Próximas Aulas
         </h3>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {upcoming.length > 0 ? upcoming.map((apt: any) => {
-            const start = new Date(apt.start_time)
-            const end = new Date(apt.end_time)
-            const now = new Date()
-            const earlyEntry = new Date(start.getTime() - 10 * 60 * 1000)
-            const canEnter = now >= earlyEntry && now <= end
-            const isOngoing = now >= start && now <= end
-            const isCancelled = apt.status === 'cancelled'
-            const displayStart = new Date(start.getTime() + 10 * 60 * 1000)
-            const teacher = apt.teacher
-
-            return (
-              <div
-                key={apt.id}
-                style={{
-                  background: '#FFFFFF',
-                  border: '1px solid rgba(229,231,235,0.7)',
-                  borderLeft: isCancelled ? '4px solid #9CA3AF' : `4px solid ${apt.is_recurring ? 'var(--primary)' : '#F59E0B'}`,
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '1.1rem 1.25rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '1.25rem',
-                  opacity: isCancelled ? 0.55 : 1,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                  transition: 'box-shadow 0.2s',
-                }}
-              >
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'center', minWidth: '45px', borderRight: '1px solid var(--border)', paddingRight: '1rem' }}>
-                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{formatInTimeZone(start, userTz, 'MMM', { locale: ptBR })}</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: isCancelled ? 'var(--text-muted)' : 'var(--primary)' }}>{formatInTimeZone(start, userTz, 'dd')}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: isCancelled ? 'var(--error)' : (apt.is_recurring ? 'var(--text-muted)' : '#CA8A04'), marginBottom: '0.2rem', fontWeight: (isCancelled || !apt.is_recurring) ? 700 : 400 }}>
-                      {isCancelled ? '● CANCELADA / REMARCADA' : (apt.is_recurring ? 'AULA FIXA DO PLANO' : 'REPOSIÇÃO / EXTRA')}
-                    </div>
-                    <div style={{ fontWeight: 600, textDecoration: isCancelled ? 'line-through' : 'none' }}>
-                      {formatInTimeZone(displayStart, userTz, 'HH:mm')} - {formatInTimeZone(end, userTz, 'HH:mm')}
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>{!isFallback ? '(seu fuso)' : '(padrão BR)'}</span>
-                    </div>
-                    <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Prof. {teacher?.full_name}</div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  {isCancelled ? (
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>Indisponível</span>
-                  ) : (
-                    <>
-                      {!isOngoing && (
-                        <Link
-                          href={`/dashboard/schedule?teacher_id=${teacher?.id}&reschedule_id=${apt.id}`}
-                          className="btn-outline"
-                          style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem', fontSize: '0.85rem', textDecoration: 'none' }}
-                        >
-                          Remarcar
-                        </Link>
-                      )}
-                      <MeetLinkButton
-                        url={teacher?.meet_url}
-                        label={isOngoing ? 'Entrar na Aula' : canEnter ? 'Sala aberta' : 'Em breve'}
-                        emptyMessage="Este professor ainda não configurou o link da sala de aula."
-                        canEnter={canEnter}
-                        isOngoing={isOngoing}
-                        className="btn-primary"
-                        style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
-                      />
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          }) : (
-            <div style={{ padding: '3.5rem 2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1.5px dashed rgba(229,231,235,0.8)', borderRadius: 'var(--radius-lg)', background: '#FFFFFF' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📅</div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.4rem', color: 'var(--text-main)' }}>Nenhuma aula agendada</div>
-              <p style={{ fontSize: '0.83rem' }}>Sem aulas nos próximos 30 dias.</p>
-            </div>
-          )}
-        </div>
+        <UpcomingClassesClient
+          upcoming={upcoming as any}
+          userTz={userTz}
+          isFallback={isFallback}
+          t={t}
+        />
 
         {/* CTA para agendar extra */}
         <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
@@ -258,16 +183,16 @@ export default async function MinhasAulasPage() {
               pointerEvents: (isActive && replacementCredits > 0) ? 'auto' : 'none'
             }}
           >
-            + Agendar Aula Extra
+            {t.myClassesPage.scheduleExtraClass}
             {isActive && (
               <span style={{ marginLeft: '0.6rem', fontSize: '0.78rem', fontWeight: 600, backgroundColor: replacementCredits > 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)', borderRadius: '99px', padding: '0.1rem 0.5rem' }}>
-                {replacementCredits} créd.
+                {replacementCredits} {t.myClassesPage.credits}
               </span>
             )}
           </Link>
-          {!isActive && <p style={{ fontSize: '0.8rem', color: 'var(--error)', marginTop: '0.5rem' }}>Plano inativo — não é possível agendar.</p>}
+          {!isActive && <p style={{ fontSize: '0.8rem', color: 'var(--error)', marginTop: '0.5rem' }}>{t.myClassesPage.planInactiveCannotSchedule}</p>}
           {isActive && replacementCredits === 0 && (
-            <p style={{ fontSize: '0.8rem', color: '#CA8A04', marginTop: '0.5rem' }}>Você não tem créditos de reposição. Aguarde o professor cancelar uma aula para receber um crédito.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{t.myClassesPage.replacementCreditsInfo}</p>
           )}
         </div>
       </section>
@@ -321,7 +246,7 @@ export default async function MinhasAulasPage() {
                     color: isCancelled ? 'var(--error)' : 'var(--success)',
                     border: `1px solid ${isCancelled ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`
                   }}>
-                    {isCancelled ? 'Cancelada' : 'Realizada'}
+                    {isCancelled ? t.myClassesPage.statusCancelled : t.myClassesPage.statusCompleted}
                   </span>
                 </div>
               )
@@ -329,7 +254,7 @@ export default async function MinhasAulasPage() {
           </div>
         ) : (
           <div style={{ padding: '2.5rem', textAlign: 'center', backgroundColor: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)' }}>
-            Nenhuma aula nos últimos 90 dias.
+            {t.myClassesPage.noClassesInHistory}
           </div>
         )}
       </section>

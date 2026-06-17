@@ -1,6 +1,8 @@
 import { MessageCircle } from 'lucide-react'
+import { getTranslation } from '@/i18n/server'
 
-export default function StudentChatEmpty() {
+export default async function StudentChatEmpty() {
+  const t = await getTranslation()
   return (
     <>
       {/* forçando root mode no mobile voltar pra sidebar igual fiz no admin */}
@@ -9,8 +11,8 @@ export default function StudentChatEmpty() {
       `}} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', backgroundColor: 'var(--bg-main)' }}>
         <MessageCircle size={64} strokeWidth={1} style={{ opacity: 0.3 }} />
-        <h3 style={{ marginTop: '1rem', fontWeight: 500, color: 'var(--text-main)' }}>Precisa de ajuda?</h3>
-        <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>Escolha um Professor na lista ao lado para puxar assunto.</p>
+        <h3 style={{ marginTop: '1rem', fontWeight: 500, color: 'var(--text-main)' }}>{t.chat.title}</h3>
+        <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>{t.chat.subtitle}</p>
       </div>
     </>
   )

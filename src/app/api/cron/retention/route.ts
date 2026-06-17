@@ -76,61 +76,12 @@ export async function GET(request: Request) {
       }
     }
 
-    // --------------------------------------------------------------------------------
-    // LÓGICA 2: FALTA DE CRÉDITOS (Apenas para planos ativos + ANTI-SPAM)
-    // --------------------------------------------------------------------------------
-    const { data: noCreditProfiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'student')
-      .eq('replacement_credits', 0)
-
-    let noCreditsAlertedCount = 0
-
-    if (noCreditProfiles && noCreditProfiles.length > 0) {
-      // Data limite para a janela antispam de 7 dias
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-
-      for (const profile of noCreditProfiles) {
-        // Só alerta quem tem assinatura ativa
-        const { data: activeSub } = await supabase
-          .from('subscriptions')
-          .select('id')
-          .eq('student_id', profile.id)
-          .eq('status', 'active')
-          .maybeSingle()
-        
-        if (activeSub) {
-          // Proteção Anti-Spam (Tabela notifications)
-          // Procura se o aluno já recebeu a notificação 'credits_empty' nos últimos 7 dias
-          const { data: recentNotif } = await supabase
-            .from('notifications')
-            .select('id')
-            .eq('user_id', profile.id)
-            .eq('type', 'system_alert')
-            .gte('created_at', sevenDaysAgo)
-            // Supabase filter syntax for JSON metadata type
-            .contains('metadata', { type: 'credits_empty' })
-            .limit(1)
-
-          if (!recentNotif || recentNotif.length === 0) {
-            await createNotification({
-              userId: profile.id,
-              type: 'system_alert',
-              title: 'Créditos Esgotados',
-              body: 'Seus créditos de reposição acabaram! Adquira um novo pacote para remarcar aulas e não perder conteúdo.',
-              metadata: { type: 'credits_empty' }
-            })
-            noCreditsAlertedCount++
-          }
-        }
-      }
-    }
+    // NOTA: crédito de reposição é concedido pelo sistema no cancelamento/remarcação.
+    // Saldo zero é o estado padrão — não deve gerar alerta ao aluno.
 
     return NextResponse.json({ 
       success: true, 
       expiredProcessed: expiredSubs?.length || 0,
-      noCreditsAlerted: noCreditsAlertedCount 
     })
 
   } catch (err: any) {
