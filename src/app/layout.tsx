@@ -41,7 +41,7 @@ export default function RootLayout({
         {/* Links Fixos Sociais - Canto Inferior Esquerdo — isolados do dark mode interno */}
         <div className="public-social-links" style={{ position: 'fixed', bottom: '80px', left: '16px', zIndex: 99, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           <a 
-            href="https://www.youtube.com/@nomadebilingue" 
+            href="#" 
             target="_blank" 
             rel="noopener noreferrer"
             style={{ 
@@ -64,7 +64,7 @@ export default function RootLayout({
           </a>
 
           <a 
-            href="https://www.instagram.com/edacademyy/" 
+            href="#" 
             target="_blank" 
             rel="noopener noreferrer"
             style={{ 
